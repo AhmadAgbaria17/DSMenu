@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
+import { AuthClient, type StaffFixture } from './staff-http';
+import { Table, TableSession, Restaurant, Product, Order, ServiceCall } from '../src/models';
+import type { TableSnapshot } from '../src/types/tables';
+export async function runTableHttpChecks(base: string, fixture: StaffFixture) {
+  const staff = new AuthClient(base); await staff.login(fixture.email, fixture.password);
+  const request = (path: string, body: unknown, method = 'POST') => staff.request(`/api/dashboard/tables${path}`, { method, headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const snapshot = async () => await (await staff.request('/api/dashboard/tables')).json() as TableSnapshot;
+  assert.equal((await fetch(`${base}/api/dashboard/tables`)).status, 401);
+  const foreign = await Restaurant.findOne({ slug: 'other' }).orFail(); const foreignTable = await Table.findOne({ restaurantId: foreign._id }).orFail();
+  const initial = await snapshot(); assert.equal(initial.tables.some(t => t.id === String(foreignTable._id)), false);
+  const injected = await (await staff.request(`/api/dashboard/tables?restaurantId=${foreign._id}`)).json() as TableSnapshot;
+  assert.deepEqual(injected.tables.map(t => t.id), initial.tables.map(t => t.id));
+  assert.deepEqual(initial.tables.map(t => t.tableNumber), initial.tables.map(t => t.tableNumber).sort((a, b) => a - b));
+  assert.equal((await request('', { tableNumber: 101, label: '', restaurantId: String(foreign._id) })).status, 400);
+  assert.equal((await request('', { tableNumber: 0 })).status, 400);
+  const created = await request('', { tableNumber: 101, label: 'Terrace' }); assert.equal(created.status, 200); const { id } = await created.json() as { id: string };
+  const row = async () => (await snapshot()).tables.find(t => t.id === id)!;
+  assert.equal((await row()).state, 'AVAILABLE');
+  assert.equal((await request('', { tableNumber: 101 })).status, 409);
+  await Table.create({ restaurantId: foreign._id, tableNumber: 101 });
+  assert.equal((await request(`/${foreignTable._id}`, { label: 'stolen', isActive: true }, 'PATCH')).status, 404);
+  assert.equal((await request(`/${id}`, { label: 'Window', isActive: true, tableNumber: 102 }, 'PATCH')).status, 400);
+  assert.equal((await request(`/${id}`, { label: 'Window', isActive: true }, 'PATCH')).status, 200); assert.equal((await row()).label, 'Window');
+  const png = await staff.request(`/api/dashboard/tables/${id}/qr`); assert.equal(png.status, 200); assert.match(png.headers.get('content-disposition')!, /salt-table-101-qr.png/);
+  assert.equal((await sharp(Buffer.from(await png.arrayBuffer())).metadata()).format, 'png');
+  assert.equal((await fetch(`${base}/api/dashboard/tables/${id}/qr`)).status, 401);
+  assert.equal((await staff.request(`/api/dashboard/tables/${foreignTable._id}/qr`)).status, 404);
+  assert.equal((await row()).qrUrl, `${base}/r/salt?table=101`);
+  staff.cookies.set('dsmenu-language', 'en');
+  const print = await (await staff.request(`/dashboard/qr-codes/print?table=${id}`)).text(); assert.match(print, /Table 101/); assert.match(print, /data:image\/png;base64/); assert.match(print, /Scan to view menu/);
+  const foreignPrint = await (await staff.request(`/dashboard/qr-codes/print?table=${foreignTable._id}`)).text(); assert.doesNotMatch(foreignPrint, /data:image\/png;base64/);
+  const customer = (part: string, payload: unknown, cookie = '') => fetch(`${base}/api/r/salt/tables/101/${part}`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json', cookie }, body: JSON.stringify(payload) });
+  await request(`/${id}`, { label: 'Window', isActive: false }, 'PATCH'); assert.equal((await row()).state, 'INACTIVE');
+  assert.equal((await customer('session', {})).status, 404); assert.equal((await staff.request(`/api/dashboard/tables/${id}/qr`)).status, 404);
+  const inactiveQr = await (await staff.request('/dashboard/qr-codes')).text(); assert.doesNotMatch(inactiveQr, new RegExp(`/api/dashboard/tables/${id}/qr`));
+  await request(`/${id}`, { label: 'Window', isActive: true }, 'PATCH');
+  const entry = await customer('session', {}); assert.equal(entry.status, 200); const cookie = entry.headers.get('set-cookie')!.split(';')[0];
+  const visit = (await row()).visit!; assert.equal((await row()).state, 'OCCUPIED');
+  assert.equal((await request(`/${id}`, { label: 'Window', isActive: false }, 'PATCH')).status, 409);
+  assert.equal((await request(`/${foreignTable._id}/close`, { sessionId: visit.id })).status, 404);
+  const product = await Product.findOne({ restaurantId: fixture.restaurantId, isAvailable: true, isArchived: false, nameEn: 'Classic Burger' }).orFail();
+  const input = () => ({ clientRequestId: randomUUID(), items: [{ productId: String(product._id), quantity: 1, note: '' }] });
+  const orderResponse = await customer('orders', input(), cookie); assert.equal(orderResponse.status, 200);
+  const order = (await orderResponse.json() as { order: { id: string } }).order;
+  assert.equal((await request(`/${id}/close`, { sessionId: visit.id })).status, 409);
+  const cancel = await staff.request(`/api/dashboard/orders/${order.id}`, { method: 'PATCH', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedStatus: 'NEW', status: 'CANCELLED' }) }); assert.equal(cancel.status, 200);
+  assert.equal((await customer('service-calls', { type: 'WAITER' }, cookie)).status, 200);
+  const blocked = await request(`/${id}/close`, { sessionId: visit.id }); assert.equal(blocked.status, 409); assert.match(await blocked.text(), /UNRESOLVED_CALLS/);
+  const call = await ServiceCall.findOne({ tableSessionId: visit.id }).orFail();
+  await ServiceCall.updateOne({ _id: call._id }, { $set: { status: 'RESOLVED', resolvedAt: new Date() } });
+  const closes = await Promise.all([request(`/${id}/close`, { sessionId: visit.id }), request(`/${id}/close`, { sessionId: visit.id })]); assert.deepEqual(closes.map(r => r.status).sort(), [200, 409]);
+  assert.equal((await row()).state, 'AVAILABLE'); const closed = await TableSession.findById(visit.id).orFail(); assert.equal(closed.status, 'CLOSED'); assert.ok(closed.closedAt);
+  assert.equal(await Order.countDocuments({ _id: order.id }), 1); assert.equal(await ServiceCall.countDocuments({ _id: call._id }), 1);
+  assert.equal((await customer('orders', input(), cookie)).status, 409); assert.equal((await customer('service-calls', { type: 'BILL' }, cookie)).status, 409);
+  assert.equal((await customer('session', {})).status, 200); const nextVisit = (await row()).visit!; assert.notEqual(nextVisit.id, visit.id);
+  assert.equal((await request(`/${id}/close`, { sessionId: visit.id })).status, 409); assert.equal((await row()).visit?.id, nextVisit.id);
+  await request(`/${id}/close`, { sessionId: nextVisit.id });
+  // A close racing an order must either block or make that old credential fail.
+  const raceEntry = await customer('session', {}); const raceCookie = raceEntry.headers.get('set-cookie')!.split(';')[0]; const raceVisit = (await row()).visit!;
+  const orderRace = await Promise.all([customer('orders', input(), raceCookie), request(`/${id}/close`, { sessionId: raceVisit.id })]);
+  assert.ok(orderRace.every(r => [200, 409].includes(r.status)));
+  const raceState = await TableSession.findById(raceVisit.id).orFail();
+  if (raceState.status === 'CLOSED') assert.equal(await Order.countDocuments({ tableSessionId: raceVisit.id }), 0);
+  else {
+    assert.equal(orderRace[1].status, 409); assert.equal(await Order.countDocuments({ tableSessionId: raceVisit.id }), 1);
+    await Order.updateMany({ tableSessionId: raceVisit.id }, { $set: { status: 'CANCELLED', cancelledAt: new Date() } });
+    assert.equal((await request(`/${id}/close`, { sessionId: raceVisit.id })).status, 200);
+  }
+  // Race entry against deactivation: never leave an inactive table with an active visit.
+  await Promise.all([customer('session', {}), request(`/${id}`, { label: 'Window', isActive: false }, 'PATCH')]);
+  const raced = await row(); assert.ok(raced.isActive || !raced.visit);
+  console.log('PASS: table CRUD, tenant isolation, immutable numbers, status, safe/concurrent closure, history, old credentials, entry/deactivation race, canonical QR PNG and printable cards.');
+}

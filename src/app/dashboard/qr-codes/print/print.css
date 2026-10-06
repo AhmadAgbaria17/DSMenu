@@ -1,0 +1,13 @@
+.qr-print-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.qr-print-card { text-align: center; border: 1px solid #d6d3d1; background: white; color: black; border-radius: 16px; padding: 24px; break-inside: avoid; }
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+  body { background: white !important; }
+  body * { visibility: hidden; }
+  .qr-print-root, .qr-print-root * { visibility: visible; }
+  .qr-print-root { position: absolute; inset: 0; width: 100%; }
+  .qr-print-grid { display: block; }
+  .qr-print-card { width: 150mm; min-height: 210mm; margin: 0 auto; padding: 15mm; border-radius: 0; break-after: page; }
+  .qr-print-card:last-child { break-after: auto; }
+  .qr-print-image { width: 85mm; height: 85mm; }
+}

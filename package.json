@@ -1,0 +1,52 @@
+{
+  "name": "dsmenu",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "create-user": "tsx --env-file-if-exists=.env.local scripts/create-user.ts",
+    "db:indexes": "tsx --env-file-if-exists=.env.local scripts/indexes.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:integration": "tsx tests/integration.ts",
+    "test:browser": "tsx tests/integration.ts --browser",
+    "create-restaurant": "tsx --env-file-if-exists=.env.local scripts/create-restaurant.ts",
+    "check:production": "tsx --env-file-if-exists=.env.local scripts/check-production.ts"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "bcryptjs": "3.0.3",
+    "mongoose": "^9.10.1",
+    "next": "^16.3.6",
+    "next-auth": "5.0.0-beta.32",
+    "next-intl": "^4.14.5",
+    "pusher": "5.3.4",
+    "pusher-js": "8.6.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
+    "sharp": "0.35.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.4",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.6",
+    "mongodb-memory-server": "^10.4.3",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3"
+  }
+}

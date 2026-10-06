@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root { color-scheme: light; }
+body { background: #f8f7f2; color: #24382f; font-family: Arial, Tahoma, sans-serif; }
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+button:not(:disabled) { cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 3px solid #b66c29; outline-offset: 4px; }
+html { scroll-behavior: smooth; scroll-padding-top: 7rem; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+::selection { background: #e2d8ad; }
+
+.menu-sheet { position: fixed; inset: auto 0 0; margin: 0 auto; width: 100%; max-width: 38rem; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 1.5rem 1.5rem 0 0; background: white; color: #24382f; padding: 0 0 env(safe-area-inset-bottom); box-shadow: 0 20px 80px #0003; }
+.menu-sheet::backdrop { background: #112b24a6; backdrop-filter: blur(3px); }
+@media (min-width: 640px) { .menu-sheet { inset: 0; margin: auto; height: fit-content; max-height: 90dvh; border-radius: 1.5rem; } }

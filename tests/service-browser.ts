@@ -1,0 +1,84 @@
+import assert from 'node:assert/strict';
+import { chromium, expect } from '@playwright/test';
+import { mockRealtime, realtimeTest } from './realtime-transport';
+import type { StaffFixture } from './staff-http';
+import { ServiceCall, Table } from '../src/models';
+export async function runServiceBrowserChecks(base: string, fixture: StaffFixture) {
+  const browser = await chromium.launch();
+  const staff = await browser.newContext({ viewport: { width: 1024, height: 900 }, timezoneId: 'America/New_York' });
+  const customer = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await mockRealtime(staff); await mockRealtime(customer);
+  await staff.addInitScript(() => {
+    let sounds = 0;
+    const original = OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start = function (...args) { document.documentElement.dataset.testSounds = String(++sounds); return original.apply(this, args); };
+  });
+  const dashboard = await staff.newPage(); const menu = await customer.newPage();
+  const errors: string[] = [];
+  dashboard.on('pageerror', error => errors.push(error.message)); menu.on('pageerror', error => errors.push(error.message));
+  dashboard.on('console', message => { if (message.type() === 'error' && /hydration|did not match|server rendered/i.test(message.text())) errors.push(message.text()); });
+  try {
+    await dashboard.goto(`${base}/login`);
+    await dashboard.getByRole('button', { name: 'English', exact: true }).click();
+    await dashboard.getByLabel('Email', { exact: true }).fill(fixture.email);
+    await dashboard.getByLabel('Password', { exact: true }).fill(fixture.password);
+    await dashboard.getByRole('button', { name: 'Log in', exact: true }).click();
+    await expect(dashboard).toHaveURL(`${base}/dashboard`);
+    await dashboard.getByRole('link', { name: 'Service Calls', exact: true }).click();
+    await expect(dashboard.getByText('Live updates connected', { exact: true })).toBeVisible();
+    await dashboard.getByRole('button', { name: 'Sound notifications', exact: true }).click();
+    await menu.goto(`${base}/r/salt?table=4`);
+    await menu.getByRole('button', { name: 'English', exact: true }).click();
+    await menu.getByRole('button', { name: 'Service', exact: true }).click();
+    await menu.getByRole('button', { name: 'Call Waiter', exact: true }).click();
+    await expect(menu.getByText('Request sent', { exact: true })).toBeVisible();
+    const table = await Table.findOne({ restaurantId: fixture.restaurantId, tableNumber: 4 }).orFail();
+    const waiter = await ServiceCall.findOne({ restaurantId: fixture.restaurantId, tableId: table._id, type: 'WAITER' }).orFail();
+    const card = dashboard.getByTestId(`service-call-${waiter._id}`);
+    await expect(card).toBeVisible();
+    await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '1');
+    const created = realtimeTest.events.at(-1)!;
+    realtimeTest.broadcast(created); realtimeTest.broadcast(created);
+    await dashboard.getByRole('button', { name: 'Refresh requests', exact: true }).click();
+    await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '1');
+    await card.getByRole('button', { name: 'Acknowledge', exact: true }).click();
+    await expect(menu.getByTestId('customer-service-WAITER')).toContainText('Staff acknowledged your request');
+    await card.getByRole('button', { name: 'Resolve', exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await expect(menu.getByTestId('customer-service-WAITER')).toContainText('Resolved');
+    await expect(menu.getByRole('button', { name: 'Call Waiter', exact: true })).toBeDisabled();
+    await dashboard.getByRole('button', { name: 'Recent history', exact: true }).click();
+    await expect(card).toBeVisible();
+    assert.equal((await ServiceCall.findById(waiter._id).orFail()).status, 'RESOLVED');
+    await ServiceCall.collection.updateOne({ _id: waiter._id }, { $set: { createdAt: new Date(Date.now() - 31_000) } });
+    await menu.getByRole('button', { name: 'Refresh requests', exact: true }).click();
+    await expect(menu.getByRole('button', { name: 'Call Waiter', exact: true })).toBeEnabled();
+    await menu.getByRole('button', { name: 'Call Waiter', exact: true }).click();
+    await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '2');
+    await menu.getByRole('button', { name: 'Request Bill', exact: true }).click();
+    await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '3');
+    await dashboard.getByRole('button', { name: 'Active requests', exact: true }).click();
+    const bill = await ServiceCall.findOne({ tableId: table._id, type: 'BILL' }).orFail();
+    await expect(dashboard.getByTestId(`service-call-${bill._id}`)).toBeVisible();
+    await dashboard.getByRole('button', { name: 'Sound notifications', exact: true }).click();
+    await menu.getByRole('button', { name: 'Need Help', exact: true }).click();
+    await expect(menu.getByTestId('customer-service-HELP')).toContainText('Pending');
+    const help = await ServiceCall.findOne({ tableId: table._id, type: 'HELP' }).orFail();
+    await expect(dashboard.getByTestId(`service-call-${help._id}`)).toBeVisible();
+    await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '3');
+    await dashboard.screenshot({ path: 'test-artifacts/service-calls-en-tablet.png', fullPage: true });
+    await menu.keyboard.press('Escape');
+    await menu.getByRole('button', { name: 'العربية', exact: true }).click();
+    await menu.getByRole('button', { name: 'الخدمة', exact: true }).click();
+    await expect(menu.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(menu.getByRole('button', { name: 'استدعاء النادل', exact: true })).toBeVisible();
+    await menu.screenshot({ path: 'test-artifacts/service-ar-mobile.png' });
+    await dashboard.getByRole('button', { name: 'עברית', exact: true }).click();
+    await expect(dashboard.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(dashboard.getByRole('heading', { name: 'בקשות שירות', exact: true })).toBeVisible();
+    for (const width of [390, 768, 1280]) { await dashboard.setViewportSize({ width, height: 900 }); assert.ok(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); }
+    assert.deepEqual(errors, []);
+    console.log('PASS: service two-browser realtime, acknowledgement/resolution, history, cooldown recovery, separate bill/help, sound dedupe/mute and AR/HE RTL.');
+  } catch (error) { await dashboard.screenshot({ path: 'test-artifacts/service-failure.png', fullPage: true }).catch(() => {}); throw error; }
+  finally { await staff.close(); await customer.close(); await browser.close(); }
+}

@@ -1,0 +1,10 @@
+import { z } from 'zod';
+import { objectIdSchema } from './validators/common';
+export const restaurantChannel = (id: string) => `private-restaurant-${objectIdSchema.parse(id)}`;
+export const visitChannel = (id: string) => `private-table-session-${objectIdSchema.parse(id)}`;
+export const realtimeAuthSchema = z.object({ socket_id: z.string().max(80).regex(/^\d+\.\d+$/), channel_name: z.string().max(180) });
+export const orderEvents = ['order.created', 'order.status.updated'] as const;
+export type OrderEvent = (typeof orderEvents)[number];
+export const serviceEvents = ['serviceCall.created', 'serviceCall.updated'] as const;
+export const realtimeEvents = [...orderEvents, ...serviceEvents];
+export type RealtimeEvent = (typeof realtimeEvents)[number];
