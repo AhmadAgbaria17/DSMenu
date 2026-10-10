@@ -20,6 +20,7 @@ export type PublicRestaurant = {
 export type PublicTable = { id: string; tableNumber: number; label: string };
 export type PublicCategory = LocalizedName & { id: string; sortOrder: number; image?: PublicImage | null };
 export type PublicProduct = LocalizedName & {
+  optionGroups?: import('@/lib/product-options').OptionGroup[];
   id: string;
   categoryId: string;
   descriptionAr: string;

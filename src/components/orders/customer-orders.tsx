@@ -1,4 +1,5 @@
 'use client';
+import { OptionSummary } from '@/components/shared/option-summary';
 
 import { useLocale, useTranslations } from 'next-intl';
 import { localizedName } from '@/i18n/config';
@@ -22,7 +23,7 @@ export function SubmitOrder() {
     {orders.confirmed && <div role="status" data-testid="order-success" className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><p className="font-bold">{t('success')}</p><p className="mt-2">{t('number', { number: orders.confirmed.orderNumber })} · {t(`status.${orders.confirmed.status}`)}</p><p className="mt-2 font-bold">{t('finalTotal', { price: formatMoney(orders.confirmed.subtotal, locale, orders.confirmed.currency) })}</p></div>}
     {(cart.lines.length > 0 || orders.uncertain) && <>
       <p className="text-sm leading-6 text-stone-600">{t('pricing')}</p>
-      <button type="button" onClick={() => void orders.send()} disabled={!orders.ready || orders.busy || orders.connecting || orders.error?.code === 'VISIT_CHANGED'} className="min-h-14 w-full rounded-full bg-emerald-950 px-6 font-bold text-white" data-testid="send-order">
+      <button type="button" onClick={() => void orders.send()} disabled={(!orders.uncertain && cart.lines.some(line => line.needsReview)) || !orders.ready || orders.busy || orders.connecting || orders.error?.code === 'VISIT_CHANGED'} className="min-h-14 w-full rounded-full bg-emerald-950 px-6 font-bold text-white" data-testid="send-order">
         {orders.busy ? t('sending') : orders.uncertain ? t('retry') : t('send')}
       </button>
     </>}
@@ -42,7 +43,7 @@ export function CustomerOrders() {
     <div className="mt-4 space-y-4">{orders.orders.map(order => <article key={order.id} data-testid="submitted-order" className="rounded-2xl border border-stone-200 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><h4 className="font-bold">{t('number', { number: order.orderNumber })}</h4><span className="rounded-full bg-stone-100 px-3 py-1 text-sm">{t(`status.${order.status}`)}</span></div>
       <time dateTime={order.createdAt} className="mt-2 block text-xs text-stone-500">{new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(order.createdAt))}</time>
-      <ul className="my-4 space-y-3">{order.items.map((item, index) => <li key={`${item.productId}:${index}`}><div className="flex justify-between gap-3 text-sm"><span>{item.quantity} × {localizedName(item, locale)}</span><bdi>{formatMoney(item.itemTotal, locale, order.currency)}</bdi></div>{item.note && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-stone-500" dir="auto">{item.note}</p>}</li>)}</ul>
+      <ul className="my-4 space-y-3">{order.items.map((item, index) => <li key={`${item.productId}:${index}`}><div className="flex justify-between gap-3 text-sm"><span>{item.quantity} × {localizedName(item, locale)}</span><bdi>{formatMoney(item.itemTotal, locale, order.currency)}</bdi></div><OptionSummary groups={item.optionGroups} />{item.note && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-stone-500" dir="auto">{item.note}</p>}</li>)}</ul>
       <p className="border-t border-stone-100 pt-3 text-end font-bold"><bdi>{formatMoney(order.subtotal, locale, order.currency)}</bdi></p>
     </article>)}</div>
   </section>;

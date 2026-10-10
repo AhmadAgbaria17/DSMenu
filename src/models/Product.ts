@@ -1,5 +1,7 @@
 import { Schema } from 'mongoose';
 import { cachedModel, reference, localizedNames, imageSchema, minorUnits } from './shared';
+import { optionGroup } from './product-options';
+import { optionGroupsSchema } from '@/lib/product-options';
 
 const schema = new Schema({
   restaurantId: reference('Restaurant'), categoryId: reference('Category'), ...localizedNames,
@@ -7,6 +9,7 @@ const schema = new Schema({
   descriptionHe: { type: String, default: '', maxlength: 2000 },
   descriptionEn: { type: String, default: '', maxlength: 2000 },
   price: minorUnits,
+  optionGroups: { type: [optionGroup], default: [], validate: (value: unknown) => optionGroupsSchema.safeParse(JSON.parse(JSON.stringify(value))).success },
   image: imageSchema,
   isAvailable: { type: Boolean, default: true },
   isFeatured: { type: Boolean, default: false },

@@ -1,3 +1,4 @@
+import { canonicalSelections, selectionsSchema, resolveOptions, type Selection, type OptionSnapshot } from './product-options';
 import { z } from 'zod';
 import { objectIdSchema, tableNumberSchema } from '@/lib/validators/common';
 import type { PublicProduct } from '@/types/menu';
@@ -7,19 +8,19 @@ export const MAX_NOTE_LENGTH = 300;
 export const MAX_CART_LINES = 100;
 export const noteSchema = z.string().trim().max(MAX_NOTE_LENGTH);
 export type CartScope = { restaurantId: string; tableNumber: number };
-export type CartItem = { productId: string; quantity: number; note: string };
-export type CartLine = CartItem & { product: PublicProduct; itemTotal: number };
+export type CartItem = { productId: string; quantity: number; note: string; selections?: Selection[] };
+export type CartLine = CartItem & { product: PublicProduct; itemTotal: number; unitPrice: number; needsReview: boolean; optionGroups: OptionSnapshot[] };
 export type CartState = { items: CartItem[]; hydrated: boolean; lastConfirmedRequestId?: string };
 export type CartAction =
   | { type: 'restore'; items: CartItem[]; lastConfirmedRequestId?: string }
   | { type: 'confirmed'; items: CartItem[]; clientRequestId: string }
-  | { type: 'add'; productId: string; quantity: number; note: string }
+  | { type: 'add'; productId: string; quantity: number; note: string; selections?: Selection[] }
   | { type: 'quantity'; key: string; quantity: number }
   | { type: 'note'; key: string; note: string }
   | { type: 'remove'; key: string };
 
 export const initialCart: CartState = { items: [], hydrated: false };
-const storedItemSchema = z.object({ productId: objectIdSchema, quantity: z.number().finite(), note: z.string() });
+const storedItemSchema = z.object({ productId: objectIdSchema, quantity: z.number().finite(), note: z.string(), selections: selectionsSchema.optional() });
 const storedCartSchema = z.object({
   version: z.literal(1), restaurantId: objectIdSchema, tableNumber: tableNumberSchema,
   items: z.array(z.unknown()).max(MAX_CART_LINES),
@@ -29,8 +30,8 @@ const storedCartSchema = z.object({
 export function cartStorageKey(scope: CartScope) {
   return `dsmenu-cart:v1:${objectIdSchema.parse(scope.restaurantId)}:${tableNumberSchema.parse(scope.tableNumber)}`;
 }
-export function cartLineKey(item: Pick<CartItem, 'productId' | 'note'>) {
-  return JSON.stringify([item.productId, item.note]);
+export function cartLineKey(item: Pick<CartItem, 'productId' | 'note' | 'selections'>) {
+  return JSON.stringify([item.productId, item.note, ...(item.selections?.length ? [canonicalSelections(item.selections)] : [])]);
 }
 export function clampQuantity(value: number) {
   return Number.isFinite(value) ? Math.min(MAX_QUANTITY, Math.max(1, Math.trunc(value))) : 1;
@@ -46,6 +47,7 @@ export function reconcileCart(items: readonly unknown[], products: PublicProduct
       productId: parsed.data.productId,
       quantity: clampQuantity(parsed.data.quantity),
       note: parsed.data.note.trim().slice(0, MAX_NOTE_LENGTH),
+      ...(parsed.data.selections ? { selections: canonicalSelections(parsed.data.selections) } : {}),
     };
     const key = cartLineKey(item);
     const existing = lines.get(key);
@@ -69,7 +71,7 @@ export function parseCart(raw: string | null, scope: CartScope, products: Public
 }
 
 export function serializeCart(items: CartItem[], scope: CartScope, lastConfirmedRequestId?: string) {
-  return JSON.stringify({ version: 1, ...scope, items: items.map(({ productId, quantity, note }) => ({ productId, quantity, note })), ...(lastConfirmedRequestId ? { lastConfirmedRequestId } : {}) });
+  return JSON.stringify({ version: 1, ...scope, items: items.map(({ productId, quantity, note, selections }) => ({ productId, quantity, note, ...(selections ? { selections } : {}) })), ...(lastConfirmedRequestId ? { lastConfirmedRequestId } : {}) });
 }
 
 export function cartReducer(state: CartState, action: CartAction, products: PublicProduct[]): CartState {
@@ -86,7 +88,9 @@ export function cartReducer(state: CartState, action: CartAction, products: Publ
     }
     case 'add': {
       if (!state.hydrated || !noteSchema.safeParse(action.note).success || !Number.isInteger(action.quantity) || action.quantity < 1 || action.quantity > MAX_QUANTITY) return state;
-      const next = { productId: action.productId, quantity: action.quantity, note: action.note.trim() };
+      const next = { productId: action.productId, quantity: action.quantity, note: action.note.trim(), ...(action.selections ? { selections: canonicalSelections(action.selections) } : {}) };
+      const product = products.find(p => p.id === action.productId);
+      try { if (!product) return state; resolveOptions(product.optionGroups, action.selections); } catch { return state; }
       const key = cartLineKey(next);
       const existing = items.find(item => cartLineKey(item) === key);
       if (!existing && items.length >= MAX_CART_LINES) return state;
@@ -98,7 +102,7 @@ export function cartReducer(state: CartState, action: CartAction, products: Publ
       const parsed = noteSchema.safeParse(action.note);
       const current = items.find(item => cartLineKey(item) === action.key);
       if (!parsed.success || !current) return state;
-      const matching = items.find(item => cartLineKey(item) !== action.key && item.productId === current.productId && item.note === parsed.data);
+      const matching = items.find(item => cartLineKey(item) !== action.key && cartLineKey(item) === cartLineKey({ ...current, note: parsed.data }));
       // Never silently discard quantities when edited notes merge two lines.
       if (matching && matching.quantity + current.quantity > MAX_QUANTITY) return state;
       return { ...state, items: reconcileCart(items.map(item => cartLineKey(item) === action.key ? { ...item, note: parsed.data } : item), products) };
@@ -112,9 +116,14 @@ export function cartReducer(state: CartState, action: CartAction, products: Publ
 // all prices and totals on the server. Neither this cart nor its scope authenticates a visit.
 export function getCartSummary(items: CartItem[], products: PublicProduct[]) {
   const catalog = new Map(products.map(product => [product.id, product]));
-  const lines: CartLine[] = reconcileCart(items, products).flatMap(item => {
+  const lines: CartLine[] = reconcileCart(items, products).flatMap<CartLine>(item => {
     const product = catalog.get(item.productId);
-    return product ? [{ ...item, product, itemTotal: product.price * item.quantity }] : [];
+    if (!product) return [];
+    try {
+      const options = resolveOptions(product.optionGroups, item.selections);
+      const unitPrice = product.price + options.optionsTotal;
+      return [{ ...item, product, unitPrice, needsReview: false, optionGroups: options.optionGroups, itemTotal: unitPrice * item.quantity }];
+    } catch { return [{ ...item, product, unitPrice: product.price, needsReview: true, optionGroups: [], itemTotal: 0 }]; }
   });
   return {
     lines,

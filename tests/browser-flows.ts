@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, expect } from '@playwright/test';
 import { mockRealtime } from './realtime-transport';
 import { cartStorageKey, serializeCart } from '../src/lib/cart';
+import { checkHorizontalMenu } from './horizontal-menu';
 
 export async function runBrowserChecks(base: string, restaurantId: string, productId: string, unavailableId: string,
   changeProduct: (patch: { price?: number; isAvailable?: boolean; image?: { url: string; publicId: string } | null }) => Promise<void>) {
@@ -22,10 +23,18 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.getByTestId('my-order-button')).toBeEnabled();
+    const arabicCatalog = await checkHorizontalMenu(page, 'rtl');
     await page.screenshot({ path: `${artifacts}/menu-ar-mobile.png`, fullPage: true });
     await page.getByRole('button', { name: 'English', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+    assert.deepEqual(await checkHorizontalMenu(page, 'ltr'), arabicCatalog, 'locale switches preserve category/product ordering');
+    const categorySections = page.locator('section[id^="category-"]');
+    assert.deepEqual(await categorySections.locator('h3').allTextContents(), ['Burgers', 'Pizza', 'Drinks', 'Desserts']);
+    assert.deepEqual(await categorySections.first().locator('h4').allTextContents(), ['Classic Burger', 'Cheeseburger']);
+    await page.getByRole('link', { name: 'Burgers', exact: true }).click();
+    await expect(page).toHaveURL(/#category-/);
+    await expect(categorySections.first()).toBeInViewport();
     await expect(page.getByTestId('detected-table')).toContainText('Table 7');
     await expect(page.getByRole('heading', { name: 'A few house favorites' })).toBeVisible();
 
@@ -81,6 +90,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await expect(page.getByTestId('my-order-button')).toContainText('144.00');
     await page.getByRole('button', { name: 'עברית', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    assert.deepEqual(await checkHorizontalMenu(page, 'rtl'), arabicCatalog, 'Hebrew preserves catalog ordering');
     await page.getByTestId('my-order-button').click();
     await expect(page.getByTestId('cart-line').first()).toContainText('המבורגר קלאסי');
     await expect(page.getByTestId('cart-line')).toHaveCount(2);

@@ -124,8 +124,8 @@ export function OrdersProvider({ slug, restaurantId, tableNumber, children }: {
     let attempt = pending.current;
     if (attempt && attempt.visitId !== visitId) { setError({ code: 'VISIT_CHANGED' }); return; }
     if (!attempt) {
-      if (!cart.lines.length) return;
-      attempt = { version: 1, visitId, input: { clientRequestId: crypto.randomUUID(), items: cart.lines.map(({ productId, quantity, note }) => ({ productId, quantity, note })) } };
+      if (!cart.lines.length || cart.lines.some(line => line.needsReview)) return;
+      attempt = { version: 1, visitId, input: { clientRequestId: crypto.randomUUID(), items: cart.lines.map(({ productId, quantity, note, selections }) => ({ productId, quantity, note, ...(selections ? { selections } : {}) })) } };
       pending.current = attempt;
       try { localStorage.setItem(pendingStorageKey(scope), JSON.stringify(attempt)); } catch { /* Cart already warns when persistence is unavailable. */ }
     }

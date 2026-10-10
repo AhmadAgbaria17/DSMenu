@@ -7,7 +7,8 @@ import { LoginForm } from '@/components/auth/login-form';
 
 export const metadata = { title: 'Staff login', robots: { index: false, follow: false } };
 export default async function LoginPage() {
-  if ((await auth())?.user?.id) redirect('/dashboard');
+  const session = await auth();
+  if (session?.user?.id) redirect(session.user.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard');
   const t = await getTranslations('StaffAuth');
   return <main className="mx-auto flex min-h-dvh max-w-6xl flex-col px-5 py-6 sm:px-8">
     <header className="flex flex-wrap items-center justify-between gap-5"><Link href="/" className="text-xl font-black tracking-tight"><bdi dir="ltr">DSMenu<span className="text-amber-700">.</span></bdi></Link><LanguageSwitcher /></header>

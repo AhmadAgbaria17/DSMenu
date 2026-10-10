@@ -1,12 +1,12 @@
 import type { DefaultSession } from 'next-auth';
-import type { StaffRole } from '@/lib/validators/staff';
+import type { AuthRole } from '@/lib/validators/staff';
 
 declare module 'next-auth' {
   interface Session {
-    user: { id: string; restaurantId: string; role: StaffRole } & DefaultSession['user'];
+    user: { id: string; restaurantId?: string; role: AuthRole } & DefaultSession['user'];
   }
-  interface User { restaurantId: string; role: StaffRole; authVersion?: number }
+  interface User { restaurantId?: string; role: AuthRole; authVersion?: number }
 }
 declare module 'next-auth/jwt' {
-  interface JWT { restaurantId?: string; role?: StaffRole; authVersion?: number }
+  interface JWT { restaurantId?: string; role?: AuthRole; authVersion?: number }
 }

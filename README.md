@@ -6,6 +6,8 @@ Implemented: database models, seed data, localized menu, table QR recognition, p
 
 ## Production Launch Checklist
 
+Product customization is documented in [Product Options](docs/PRODUCT-OPTIONS.md), including staff setup, pricing/snapshot rules, backward compatibility and a Classic Burger smoke test.
+
 - [ ] Review source and staged files for secrets before publishing; this workspace has no Git history to audit.
 - [ ] Provision separate production Atlas/Pusher/Cloudinary resources and canonical HTTPS origins.
 - [ ] Run `npm run db:indexes` with the intended production database, then the insert-only `npm run create-restaurant -- --name "Restaurant Name" --slug restaurant-name` operator CLI.
@@ -681,3 +683,8 @@ The MVP feature set is frozen. Production operations and handover are documented
 | `npm run test:browser` | PASS: all previous flows and new analytics UI checks |
 
 English tablet and Arabic mobile report screenshots were visually reviewed. Test coverage includes exact midnight boundaries, both Jerusalem DST transitions, cancelled/active/served value definitions, rounded integer-agora averages, deleted/archived product history, invalid/missing/future timestamps, tenant overrides, notes/credential exclusion and preservation of unique indexes. Pusher/Cloudinary network transports remain mocked in tests; no production service was invoked. No new dependency or secret was introduced.
+
+
+### Super Admin
+
+Platform owners can create restaurants and their initial OWNER through `/admin`, then activate/deactivate restaurants without deleting history. Bootstrap the first platform account using `npm run create-super-admin`; see [setup, security and manual checks](docs/SUPER-ADMIN.md). Existing employee CLI tools remain available.

@@ -1,4 +1,5 @@
 import 'server-only';
+import { optionGroupsSchema, resolveOptions } from '@/lib/product-options';
 import mongoose from 'mongoose';
 import { Category, Order, Product, TableSession } from '@/models';
 import { connectMongo } from '@/lib/mongodb';
@@ -46,7 +47,11 @@ export async function submitCustomerOrder(slug: string, tableValue: string, toke
     if (invalid.length) throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, invalid);
     const items = input.items.map(item => {
       const product = catalog.get(item.productId)!;
-      return { productId: product._id, nameAr: product.nameAr, nameHe: product.nameHe, nameEn: product.nameEn, price: product.price, quantity: item.quantity, notes: item.note, itemTotal: product.price * item.quantity };
+      let customization;
+      try { customization = resolveOptions(optionGroupsSchema.parse(product.optionGroups ?? []), item.selections); }
+      catch { throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, [item.productId]); }
+      const price = product.price + customization.optionsTotal;
+      return { ...customization, basePrice: product.price, productId: product._id, nameAr: product.nameAr, nameHe: product.nameHe, nameEn: product.nameEn, price, quantity: item.quantity, notes: item.note, itemTotal: price * item.quantity };
     });
     const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
     if (!moneySchema.safeParse(subtotal).success || items.some(item => !moneySchema.safeParse(item.price).success || !moneySchema.safeParse(item.itemTotal).success)) throw new CustomerRequestError('ORDER_LIMIT', 422);

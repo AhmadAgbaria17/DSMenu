@@ -2,7 +2,7 @@ import { Restaurant } from '@/models';
 import { connectMongo } from './mongodb';
 import { createRestaurantSchema } from './validators/restaurant-admin';
 
-// Operator CLI only: no public registration or web super-admin endpoint.
+// Legacy operator CLI. Web onboarding uses the separately guarded platform transaction.
 export async function createRestaurant(input: unknown) {
   const data = createRestaurantSchema.parse(input);
   await connectMongo();

@@ -15,3 +15,12 @@ export const staffClaimsSchema = z.object({
   sub: objectIdSchema, restaurantId: objectIdSchema, role: z.enum(staffRoles),
   authVersion: z.number().int().nonnegative(),
 });
+
+export const authClaimsSchema = z.union([staffClaimsSchema, z.object({
+  sub: objectIdSchema, role: z.literal('SUPER_ADMIN'), restaurantId: z.undefined().optional(),
+  authVersion: z.number().int().nonnegative(),
+})]);
+export type AuthRole = StaffRole | 'SUPER_ADMIN';
+export const createSuperAdminSchema = loginSchema.extend({
+  name: z.string().trim().min(1).max(160), password: createStaffSchema.shape.password,
+}).strict();

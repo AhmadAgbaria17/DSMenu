@@ -150,6 +150,14 @@ async function main() {
     const { runAnalyticsHttpChecks } = await import('./analytics-http');
     const analyticsFixture = await runAnalyticsHttpChecks(base, staffFixture);
     if (process.argv.includes('--browser')) { const { runAnalyticsBrowserChecks } = await import('./analytics-browser'); await runAnalyticsBrowserChecks(base, analyticsFixture); }
+    const { runOptionsHttpChecks } = await import('./options-http');
+    await runOptionsHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runOptionsBrowserChecks } = await import('./options-browser'); await runOptionsBrowserChecks(base, staffFixture); }
+    const { runOptionsDemoChecks } = await import('./options-demo-integration');
+    await runOptionsDemoChecks();
+    const { runPlatformHttpChecks } = await import('./platform-http');
+    const platformFixture = await runPlatformHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runPlatformBrowserChecks } = await import('./platform-browser'); await runPlatformBrowserChecks(base, platformFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

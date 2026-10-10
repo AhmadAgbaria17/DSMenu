@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { selectionsSchema } from '../product-options';
 import { objectIdSchema } from './common';
 import { MAX_CART_LINES, MAX_QUANTITY, noteSchema, cartLineKey } from '@/lib/cart';
 
@@ -6,6 +7,7 @@ export const orderItemInput = z.object({
   productId: objectIdSchema.transform(value => value.toLowerCase()),
   quantity: z.number().int().min(1).max(MAX_QUANTITY),
   note: noteSchema,
+  selections: selectionsSchema.optional(),
 });
 // Unknown client fields (prices, names, tenant IDs, totals) are deliberately stripped.
 export const orderInput = z.object({

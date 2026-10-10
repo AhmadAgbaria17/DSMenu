@@ -1,10 +1,14 @@
 import { Schema } from 'mongoose';
 import { orderStatuses } from '@/types/domain';
 import { cachedModel, reference, localizedNames, minorUnits } from './shared';
+import { optionSnapshot } from './product-options';
 
 const itemSchema = new Schema({
   productId: reference('Product'), ...localizedNames,
   price: minorUnits,
+  basePrice: { ...minorUnits, required: false },
+  optionsTotal: { ...minorUnits, required: false },
+  optionGroups: { type: [optionSnapshot], default: [] },
   quantity: { type: Number, required: true, min: 1, max: 99, validate: Number.isInteger },
   notes: { type: String, maxlength: 500, default: '' },
   itemTotal: minorUnits,

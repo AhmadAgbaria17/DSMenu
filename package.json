@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "seed:options-demo": "tsx --env-file-if-exists=.env.demo.local scripts/seed-options-demo.ts",
+    "create-super-admin": "tsx --env-file-if-exists=.env.local scripts/create-super-admin.ts",
     "create-user": "tsx --env-file-if-exists=.env.local scripts/create-user.ts",
     "db:indexes": "tsx --env-file-if-exists=.env.local scripts/indexes.ts",
     "test": "tsx --test tests/*.test.ts",

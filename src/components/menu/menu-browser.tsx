@@ -61,13 +61,13 @@ function MenuContents({ restaurant, table, categories, products }: MenuBrowserPr
       {visibleCategories.map(category => <a key={category.id} href={`#category-${category.id}`} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-stone-300 bg-white px-5 text-sm font-bold hover:bg-emerald-950 hover:text-white">{localizedName(category, locale)}</a>)}
     </nav>}
     {activeSearch && <p role="status" className="mb-5 text-sm text-stone-600">{t('results', { count: visible.length })}</p>}
-    {featured.length > 0 && <section aria-labelledby="featured-title" className="mb-10"><div className="mb-5 flex items-baseline gap-3"><span aria-hidden="true" className="text-amber-800">✦</span><h2 id="featured-title" className="text-2xl font-bold">{t('featured')}</h2></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{featured.map(card)}</div></section>}
+    {featured.length > 0 && <section aria-labelledby="featured-title" className="mb-10"><div className="mb-5 flex items-baseline gap-3"><span aria-hidden="true" className="text-amber-800">✦</span><h2 id="featured-title" className="text-2xl font-bold">{t('featured')}</h2></div><div key={locale} className="menu-product-row" role="region" aria-labelledby="featured-title" tabIndex={0}>{featured.map(card)}</div></section>}
     <h2 className="mb-6 text-3xl font-bold">{menu('title')}</h2>
     {visible.length === 0 && <div className="mb-8 rounded-2xl border border-dashed border-stone-300 p-10 text-center"><p className="font-bold">{activeSearch ? t('noResults') : menu('empty')}</p>{activeSearch && <button type="button" onClick={() => setQuery('')} className="mt-4 min-h-11 rounded-full bg-white px-5 font-bold">{t('clearSearch')}</button>}</div>}
     {visibleCategories.map(category => {
       const categoryProducts = visible.filter(product => product.categoryId === category.id);
-      return <section key={category.id} id={`category-${category.id}`} className="mb-10 scroll-mt-24">{category.image && <MenuImage image={category.image} alt={localizedName(category, locale)} className="mb-4 h-32 w-full rounded-2xl" />}<h3 className="mb-5 text-xl font-bold">{localizedName(category, locale)}</h3>
-        {categoryProducts.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{categoryProducts.map(card)}</div> : <p className="rounded-xl bg-white p-6 text-sm text-stone-500">{t('emptyCategory')}</p>}
+      return <section key={category.id} id={`category-${category.id}`} className="mb-10 scroll-mt-24">{category.image && <MenuImage image={category.image} alt={localizedName(category, locale)} className="mb-4 h-32 w-full rounded-2xl" />}<h3 id={`category-title-${category.id}`} className="mb-5 text-xl font-bold">{localizedName(category, locale)}</h3>
+        {categoryProducts.length ? <div key={locale} className="menu-product-row" role="region" aria-labelledby={`category-title-${category.id}`} tabIndex={0}>{categoryProducts.map(card)}</div> : <p className="rounded-xl bg-white p-6 text-sm text-stone-500">{t('emptyCategory')}</p>}
       </section>;
     })}
     {selected && <ProductDetails key={selected.id} product={selected} currency={restaurant.currency} onClose={() => setSelectedId(null)} onAdded={() => { setSelectedId(null); setAdded(true); }} />}

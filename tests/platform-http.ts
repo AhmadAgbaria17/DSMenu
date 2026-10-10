@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { Types } from 'mongoose';
+import { User, Restaurant, Table, TableSession, Order, ServiceCall } from '../src/models';
+import { createSuperAdmin } from '../src/lib/platform-bootstrap';
+import { createStaffUser } from '../src/lib/staff-users';
+import { verifyPassword } from '../src/lib/password';
+import { AuthClient, type StaffFixture } from './staff-http';
+
+export async function runPlatformHttpChecks(base: string, fixture: StaffFixture) {
+  const password = randomBytes(24).toString('base64url');
+  const bootstrap = await new Promise<{ code: number | null; output: string }>((resolve, reject) => {
+    const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/create-super-admin.ts', '--name', 'Platform Admin', '--email', ' ADMIN@PLATFORM.LOCAL '], { env: { ...process.env, NODE_ENV: 'production', DSMENU_SUPER_ADMIN_PASSWORD: password }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = ''; child.stdout.on('data', chunk => { output += chunk; }); child.stderr.on('data', chunk => { output += chunk; }); child.on('error', reject); child.on('close', code => resolve({ code, output }));
+  });
+  assert.equal(bootstrap.code, 0); assert.ok(!bootstrap.output.includes(password)); assert.ok(!bootstrap.output.includes(process.env.MONGODB_URI!));
+  const adminRecord = await User.findOne({ email: 'admin@platform.local' }).orFail();
+  const admin = { id: String(adminRecord._id), email: adminRecord.email };
+  const stored = await User.findById(admin.id).select('+passwordHash').orFail();
+  assert.equal(stored.restaurantId, undefined); assert.equal(stored.role, 'SUPER_ADMIN');
+  assert.ok(await verifyPassword(password, stored.passwordHash));
+  await assert.rejects(createSuperAdmin({ name: 'Duplicate', email: admin.email, password }), { code: 11000 });
+  const client = new AuthClient(base); await client.login(admin.email, password);
+  assert.equal((await client.session())?.user?.role, 'SUPER_ADMIN');
+  assert.equal((await client.session())?.user?.restaurantId, undefined);
+  const adminHtml = await (await client.request('/admin')).text(); assert.match(adminHtml, /admin-overview/); assert.doesNotMatch(adminHtml, /passwordHash/);
+  const write = (actor: AuthClient, input: unknown, path = '/api/admin/restaurants', method = 'POST') => actor.request(path, { method, headers: { origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+  const input = { name: 'Salt Test', slug: 'salt-test', ownerName: 'Test Owner', ownerEmail: ' OWNER@SALT-TEST.LOCAL ', password };
+  const anonymous = new AuthClient(base);
+  assert.equal((await anonymous.request('/api/admin/restaurants')).status, 401);
+  assert.equal((await write(anonymous, input)).status, 401);
+  const protectedPage = await anonymous.request('/admin');
+  assert.ok(protectedPage.status === 307 || /url=\/login/.test(await protectedPage.text()));
+  for (const role of ['OWNER', 'STAFF']) {
+    const account = await createStaffUser({ restaurant: 'salt', name: role, email: `${role.toLowerCase()}-platform-check@salt.local`, password, role });
+    const actor = new AuthClient(base); await actor.login(account.email, password);
+    assert.equal((await actor.request('/api/admin/restaurants')).status, 403);
+    assert.equal((await write(actor, input)).status, 403);
+    const page = await actor.request('/admin'); const html = await page.text(); assert.doesNotMatch(html, /admin-overview/); assert.ok(page.status === 307 || /url=\/dashboard/.test(html));
+    await actor.request('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csrfToken: await actor.csrf(), data: { user: { role: 'SUPER_ADMIN', restaurantId: undefined } } }) });
+    assert.equal((await write(actor, input)).status, 403);
+    assert.equal((await write(actor, { isActive: false }, `/api/admin/restaurants/${fixture.restaurantId}`, 'PATCH')).status, 403);
+  }
+  assert.equal((await client.request('/api/dashboard/orders')).status, 401, 'no platform tenant fallback');
+  for (const patch of [{ role: 'SUPER_ADMIN' }, { password: 'short' }, { slug: 'Bad Slug' }]) assert.equal((await write(client, { ...input, ...patch })).status, 400);
+  const csrf = await client.request('/api/admin/restaurants', { method: 'POST', headers: { origin: 'https://evil.example', 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); assert.equal(csrf.status, 403);
+  const response = await write(client, input); assert.equal(response.status, 201); const result = await response.json() as { id: string; slug: string };
+  assert.deepEqual(Object.keys(result).sort(), ['id', 'slug']);
+  const owner = await User.findOne({ restaurantId: result.id }).select('+passwordHash').orFail();
+  assert.equal(owner.role, 'OWNER'); assert.equal(owner.email, 'owner@salt-test.local'); assert.equal(owner.isActive, true); assert.ok(await verifyPassword(password, owner.passwordHash));
+  assert.equal(Object.hasOwn(owner.toObject(), 'password'), false); assert.notEqual(owner.passwordHash, password);
+  assert.equal((await write(client, { ...input, ownerEmail: 'new-owner@example.com' })).status, 409);
+  assert.equal(await User.countDocuments({ email: 'new-owner@example.com' }), 0);
+  const duplicateEmail = await write(client, { ...input, slug: 'rollback-restaurant' }); assert.equal(duplicateEmail.status, 409); assert.equal((await duplicateEmail.json()).error.code, 'EMAIL_EXISTS');
+  assert.equal(await Restaurant.countDocuments({ slug: 'rollback-restaurant' }), 0, 'owner duplicate aborts restaurant insertion');
+  const races = await Promise.all([write(client, { ...input, slug: 'race-a', ownerEmail: 'race@platform.local' }), write(client, { ...input, slug: 'race-b', ownerEmail: 'RACE@PLATFORM.LOCAL' })]);
+  assert.deepEqual(races.map(r => r.status).sort(), [201, 409]); assert.equal(await Restaurant.countDocuments({ slug: { $in: ['race-a', 'race-b'] } }), 1);
+  const list = await (await client.request('/api/admin/restaurants')).text(); assert.doesNotMatch(list, /passwordHash|authVersion/); assert.ok(!list.includes(password));
+  const ownerClient = new AuthClient(base); await ownerClient.login(owner.email, password); assert.equal((await ownerClient.session())?.user?.restaurantId, result.id);
+  const dashboard = await (await ownerClient.request('/dashboard')).text(); assert.match(dashboard, /Salt Test/); assert.doesNotMatch(dashboard, /TenantSecret|Private restaurant/);
+  const table = await Table.create({ restaurantId: result.id, tableNumber: 1 });
+  const visit = await TableSession.create({ restaurantId: result.id, tableId: table._id });
+  const call = await ServiceCall.create({ restaurantId: result.id, tableId: table._id, tableSessionId: visit._id, type: 'WAITER' });
+  const history = await Order.create({ restaurantId: result.id, tableId: table._id, tableSessionId: visit._id, orderNumber: 1, idempotencyKey: 'admin-history-check', status: 'SERVED', subtotal: 4800, items: [{ productId: new Types.ObjectId(), nameAr: 'Historical', nameHe: 'Historical', nameEn: 'Historical', price: 4800, quantity: 1, itemTotal: 4800 }] });
+  const before = await Promise.all([User.countDocuments({ restaurantId: result.id }), TableSession.countDocuments({ restaurantId: result.id }), Order.countDocuments({ restaurantId: result.id })]);
+  assert.equal((await write(client, { isActive: false }, `/api/admin/restaurants/${result.id}`, 'PATCH')).status, 200);
+  assert.equal(await ownerClient.session(), null); const disabled = new AuthClient(base); await disabled.login(owner.email, password); assert.equal(await disabled.session(), null);
+  const menu = await (await fetch(`${base}/r/salt-test`, { headers: { cookie: 'dsmenu-language=en' } })).text(); assert.match(menu, /Restaurant not found/);
+  assert.deepEqual(await Promise.all([User.countDocuments({ restaurantId: result.id }), TableSession.countDocuments({ restaurantId: result.id }), Order.countDocuments({ restaurantId: result.id })]), before); assert.ok(await ServiceCall.exists({ _id: call._id })); assert.equal((await Order.findById(history._id).orFail()).subtotal, 4800);
+  assert.equal((await write(client, { isActive: true }, `/api/admin/restaurants/${result.id}`, 'PATCH')).status, 200);
+  await ownerClient.login(owner.email, password); assert.ok((await ownerClient.session())?.user);
+  await User.updateOne({ _id: admin.id }, { $set: { isActive: false } }); assert.equal((await client.request('/api/admin/restaurants')).status, 401);
+  await User.updateOne({ _id: admin.id }, { $set: { isActive: true } }); await client.login(admin.email, password);
+  const copy = new AuthClient(base); copy.cookies = new Map(client.cookies); await client.logout(); assert.equal((await copy.request('/api/admin/restaurants')).status, 401);
+  console.log('PASS: platform guards, bootstrap, private DTOs, staff escalation rejection, transactional restaurant/owner creation and rollback/races, bcrypt, normalized uniqueness, activation, historical preservation and session revocation.');
+  return { email: admin.email, password };
+}

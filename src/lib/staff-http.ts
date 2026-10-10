@@ -6,8 +6,8 @@ export class StaffApiError extends Error {
 }
 export async function requireStaffApi() {
   const session = await auth();
-  if (!session?.user?.id || !session.user.restaurantId) throw new StaffApiError('UNAUTHORIZED', 401);
-  return session.user;
+  if (!session?.user?.id || !session.user.restaurantId || !['OWNER', 'STAFF'].includes(session.user.role)) throw new StaffApiError('UNAUTHORIZED', 401);
+  return { ...session.user, restaurantId: session.user.restaurantId };
 }
 export function staffFailure(error: unknown) {
   return error instanceof StaffApiError ? customerJson({ error: { code: error.code } }, error.status) : customerFailure(error);

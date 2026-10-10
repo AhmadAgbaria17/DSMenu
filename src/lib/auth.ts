@@ -2,7 +2,7 @@ import 'server-only';
 import NextAuth, { AuthError } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { authEnv } from './env';
-import { staffClaimsSchema } from './validators/staff';
+import { authClaimsSchema } from './validators/staff';
 import { authenticateStaff, revokeStaffSessions, validateStaffClaims } from './services/staff-auth';
 
 // Lazy configuration keeps public menus and build independent of staff secrets.
@@ -24,7 +24,7 @@ export const { auth, handlers } = NextAuth(() => {
         return { ...token, sub: current.id, restaurantId: current.restaurantId, role: current.role, authVersion: current.authVersion, name: current.name, email: current.email };
       },
       session({ session, token }) {
-        const claims = staffClaimsSchema.parse(token);
+        const claims = authClaimsSchema.parse(token);
         return { expires: session.expires, user: { id: claims.sub, restaurantId: claims.restaurantId, role: claims.role, name: token.name, email: token.email } };
       },
       redirect({ url }) {

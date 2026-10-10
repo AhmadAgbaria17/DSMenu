@@ -1,4 +1,5 @@
 'use client';
+import { OptionSummary } from '@/components/shared/option-summary';
 
 import { useLocale, useTranslations } from 'next-intl';
 import { localizedName } from '@/i18n/config';
@@ -31,6 +32,7 @@ export function MyOrderDrawer({ restaurant, table, onClose }: { restaurant: Publ
   const cart = useCart();
   const orders = useOrders();
   const orderText = useTranslations('Orders');
+  const optionsText = useTranslations('Options');
   const locale = useLocale();
   const t = useTranslations('Shopping');
   const menu = useTranslations('Menu');
@@ -43,10 +45,12 @@ export function MyOrderDrawer({ restaurant, table, onClose }: { restaurant: Publ
           const key = cartLineKey(line);
           return <li key={key} className="py-5" data-testid="cart-line">
             <div className="flex gap-4"><MenuImage image={line.product.image} alt={name} className="size-20 shrink-0 rounded-xl" />
-              <div className="min-w-0 flex-1"><h3 className="font-bold">{name}</h3><p className="mt-1 text-sm text-stone-500">{t('unitPrice', { price: formatMoney(line.product.price, locale, restaurant.currency) })}</p>{line.note && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-stone-600" dir="auto">{line.note}</p>}</div>
+              <div className="min-w-0 flex-1"><h3 className="font-bold">{name}</h3><p className="mt-1 text-sm text-stone-500">{t('unitPrice', { price: formatMoney(line.unitPrice, locale, restaurant.currency) })}</p>{line.note && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-stone-600" dir="auto">{line.note}</p>}</div>
               <bdi className="shrink-0 text-sm font-bold">{formatMoney(line.itemTotal, locale, restaurant.currency)}</bdi>
             </div>
             {orders.error?.itemIds?.includes(line.productId) && <p className="mt-3 text-sm font-bold text-red-800">{orderText('itemUnavailable')}</p>}
+            <OptionSummary groups={line.optionGroups} />
+            {line.needsReview && <p role="alert" className="mt-3 font-bold text-red-800">{optionsText('review')}</p>}
             <CartNote line={line} />
             <fieldset disabled={cart.locked} className="mt-4 flex items-center justify-between gap-3"><QuantityControl name={name} quantity={line.quantity} onChange={quantity => cart.dispatch({ type: 'quantity', key, quantity })} /><button type="button" aria-label={t('removeProduct', { name })} onClick={() => cart.dispatch({ type: 'remove', key })} className="min-h-11 rounded-full px-4 text-sm font-medium text-red-800 hover:bg-red-50">{t('remove')}</button></fieldset>
           </li>;

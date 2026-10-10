@@ -1,3 +1,5 @@
+import { canonicalSelections } from './product-options';
+import { cartLineKey } from './cart';
 import { createHash, randomBytes } from 'node:crypto';
 import type { OrderInput } from '@/lib/validators/orders';
 
@@ -11,6 +13,6 @@ export function customerCookieName(restaurantId: string, tableNumber: number) {
   return `dsmenu-visit-${restaurantId}-${tableNumber}`;
 }
 export function orderFingerprint(input: OrderInput) {
-  const items = [...input.items].sort((a, b) => JSON.stringify([a.productId, a.note]).localeCompare(JSON.stringify([b.productId, b.note])));
+  const items = input.items.map(({ productId, quantity, note, selections }) => ({ productId, quantity, note, ...(selections?.length ? { selections: canonicalSelections(selections) } : {}) })).sort((a, b) => cartLineKey(a).localeCompare(cartLineKey(b)));
   return createHash('sha256').update(JSON.stringify(items)).digest('hex');
 }
