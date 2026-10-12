@@ -6,3 +6,5 @@ export { Category } from './Category';
 export { Product } from './Product';
 export { Order } from './Order';
 export { ServiceCall } from './ServiceCall';
+
+export { TakeawaySession } from './TakeawaySession';

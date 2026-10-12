@@ -13,15 +13,15 @@ import { OrdersProvider } from '@/components/orders/orders-provider';
 import { ServiceActions } from './service-actions';
 import { MenuImage } from './menu-image';
 
-type MenuBrowserProps = { restaurant: PublicRestaurant; table: PublicTable | null; categories: PublicCategory[]; products: PublicProduct[] };
+export type MenuBrowserProps = { takeawayVisitId?: string; restaurant: PublicRestaurant; table: PublicTable | null; categories: PublicCategory[]; products: PublicProduct[] };
 
 export function MenuBrowser(props: MenuBrowserProps) {
-  return <CartProvider key={`${props.restaurant.id}:${props.table?.tableNumber ?? 'none'}`} restaurantId={props.restaurant.id} tableNumber={props.table?.tableNumber ?? null} products={props.products}>
-    <OrdersProvider slug={props.restaurant.slug} restaurantId={props.restaurant.id} tableNumber={props.table?.tableNumber ?? null}><MenuContents {...props} /></OrdersProvider>
+  return <CartProvider key={`${props.restaurant.id}:${props.takeawayVisitId ?? props.table?.tableNumber ?? 'none'}`} restaurantId={props.restaurant.id} tableNumber={props.table?.tableNumber ?? null} takeawayVisitId={props.takeawayVisitId} products={props.products}>
+    <OrdersProvider takeawayVisitId={props.takeawayVisitId} slug={props.restaurant.slug} restaurantId={props.restaurant.id} tableNumber={props.table?.tableNumber ?? null}><MenuContents {...props} /></OrdersProvider>
   </CartProvider>;
 }
 
-function MenuContents({ restaurant, table, categories, products }: MenuBrowserProps) {
+function MenuContents({ restaurant, table, categories, products, takeawayVisitId }: MenuBrowserProps) {
   const locale = useLocale();
   const t = useTranslations('Shopping');
   const menu = useTranslations('Menu');
@@ -55,7 +55,7 @@ function MenuContents({ restaurant, table, categories, products }: MenuBrowserPr
         {query && <button type="button" aria-label={t('clearSearch')} onClick={() => setQuery('')} className="absolute end-1 top-1 grid size-12 place-items-center rounded-full text-xl">×</button>}
       </div>
     </div>
-    {!table && <p className="mb-4 text-sm text-stone-600">{t('selectTable')}</p>}
+    {!table && !takeawayVisitId && <p className="mb-4 text-sm text-stone-600">{t('selectTable')}</p>}
     {cart.warning && <div role="status" className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-950"><p>{t(cart.warning === 'storage' ? 'storageWarning' : 'cartRecovered')}</p><button type="button" onClick={cart.dismissWarning} aria-label={t('close')} className="size-11 shrink-0 rounded-full">×</button></div>}
     {visibleCategories.length > 0 && <nav aria-label={menu('categories')} className="sticky top-0 z-10 -mx-5 mb-8 flex gap-2 overflow-x-auto border-b border-stone-200 bg-[#f8f7f2]/95 px-5 py-4 backdrop-blur sm:mx-0 sm:px-0">
       {visibleCategories.map(category => <a key={category.id} href={`#category-${category.id}`} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-stone-300 bg-white px-5 text-sm font-bold hover:bg-emerald-950 hover:text-white">{localizedName(category, locale)}</a>)}
@@ -71,8 +71,8 @@ function MenuContents({ restaurant, table, categories, products }: MenuBrowserPr
       </section>;
     })}
     {selected && <ProductDetails key={selected.id} product={selected} currency={restaurant.currency} onClose={() => setSelectedId(null)} onAdded={() => { setSelectedId(null); setAdded(true); }} />}
-    {table && <MyOrderButton currency={restaurant.currency} tableNumber={table.tableNumber} onOpen={() => { setAdded(false); setOrderOpen(true); }} />}
-    {orderOpen && table && <MyOrderDrawer restaurant={restaurant} table={table} onClose={() => setOrderOpen(false)} />}
+    {(table || takeawayVisitId) && <MyOrderButton currency={restaurant.currency} tableNumber={table?.tableNumber ?? null} onOpen={() => { setAdded(false); setOrderOpen(true); }} />}
+    {orderOpen && (table || takeawayVisitId) && <MyOrderDrawer restaurant={restaurant} table={table} onClose={() => setOrderOpen(false)} />}
     <div role="status" aria-live="polite" className={added ? 'fixed inset-x-5 bottom-28 z-30 mx-auto w-fit max-w-[calc(100%-2.5rem)] rounded-full bg-white px-6 py-3 text-sm font-bold shadow-lg ring-1 ring-stone-200' : 'sr-only'}>{added ? t('added') : ''}</div>
   </>;
 }

@@ -20,7 +20,7 @@ export function orderFacets(now: Date): PipelineStage.Facet['$facet'] {
     days: [{ $group: { _id: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d', timezone: reportingTimezone } }, orders: { $sum: nonCancelledCount }, completedValue: { $sum: completedValue } } }],
     hours: [{ $match: { status: { $ne: 'CANCELLED' } } }, { $group: { _id: { $hour: { date: '$createdAt', timezone: reportingTimezone } }, orders: { $sum: 1 } } }],
     products: [{ $match: { status: 'SERVED' } }, { $sort: { createdAt: -1, _id: -1 } }, { $unwind: '$items' }, { $group: { _id: '$items.productId', nameAr: { $first: '$items.nameAr' }, nameHe: { $first: '$items.nameHe' }, nameEn: { $first: '$items.nameEn' }, quantity: { $sum: '$items.quantity' }, completedValue: { $sum: '$items.itemTotal' } } }, { $sort: { quantity: -1, completedValue: -1, _id: 1 } }, { $limit: 10 }],
-    tables: [{ $match: { status: { $ne: 'CANCELLED' } } }, { $group: { _id: '$tableId', orders: { $sum: 1 }, completedValue: { $sum: completedValue } } }],
+    tables: [{ $match: { status: { $ne: 'CANCELLED' }, tableId: { $type: 'objectId' } } }, { $group: { _id: '$tableId', orders: { $sum: 1 }, completedValue: { $sum: completedValue } } }],
     timing: [{ $match: { status: { $ne: 'CANCELLED' } } }, { $project: { accept: elapsed('createdAt', 'acceptedAt', now), prepare: elapsed('preparingAt', 'readyAt', now), fulfill: { $cond: [{ $eq: ['$status', 'SERVED'] }, elapsed('createdAt', 'servedAt', now), null] } } }, { $group: timingGroup(['accept', 'prepare', 'fulfill']) }],
   };
 }

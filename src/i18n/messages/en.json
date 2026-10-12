@@ -1,4 +1,6 @@
 {
+  "Takeaway": {"title":"Take Away","qr":"Takeaway QR","name":"Name","phone":"Phone number","continue":"Continue to menu","hint":"Enter your name and phone number to place a takeaway order. Pay at the restaurant.","loading":"Please wait…","invalid":"Enter a name (2–100 characters) and a valid phone number (7–15 digits).","failed":"Unable to continue. Please try again.","ready":"Your order is ready for pickup","pickedUp":"Picked up","markPickedUp":"Mark picked up"},
+  "ProductGrid": {"search":"Search products","categories":"Product categories","all":"All categories","uncategorized":"Uncategorized","repair":"These products need a valid category. Edit the product to assign one.","count":"{count} products","options":"Options: {count} groups","empty":"No matching products."},
   "Admin": {
     "title": "Admin",
     "overview": "Overview",
@@ -174,10 +176,10 @@
     "finalTotal": "Confirmed total: {price}",
     "refresh": "Refresh status",
     "empty": "No orders sent during this visit yet.",
-    "visitHint": "Orders for this table’s current visit. Refresh to check the latest status.",
+    "visitHint": "Orders for your current visit. Refresh to check the latest status.",
     "pricing": "Prices are checked when you send. Your confirmed total will use the restaurant’s current prices.",
     "itemUnavailable": "This item is no longer available. Remove it before sending again.",
-    "newVisit": "Reload table visit",
+    "newVisit": "Reload visit",
     "discardPending": "Review and unlock my selection",
     "discardWarning": "This order may already have reached the restaurant. Check My Orders or ask staff before unlocking and placing another order. Continue?",
     "status": {
@@ -192,8 +194,8 @@
       "INVALID_REQUEST": "Please check the quantities and notes in your selection.",
       "FORBIDDEN": "We could not verify this request. Reload the page and try again.",
       "TABLE_UNAVAILABLE": "This restaurant or table is not available. Please ask a member of staff.",
-      "SESSION_REQUIRED": "Your table connection has expired or cookies are blocked. Reload your visit to reconnect.",
-      "SESSION_CLOSED": "This table visit has closed. No new order was added. Check with staff before starting a new visit.",
+      "SESSION_REQUIRED": "Your session has expired or cookies are blocked. Reload your visit to reconnect.",
+      "SESSION_CLOSED": "This visit has closed. No new order was added. Check with staff before starting a new visit.",
       "SESSION_LIMIT": "Too many devices have joined this visit. Please ask a member of staff.",
       "ITEMS_UNAVAILABLE": "Some items are no longer available. Nothing was ordered. Your selection has been kept below.",
       "REQUEST_CONFLICT": "This request was already used for a different selection. Check My Orders before trying again.",

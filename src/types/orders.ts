@@ -2,6 +2,7 @@ import type { LocalizedName, orderStatuses } from './domain';
 
 export type OrderStatus = (typeof orderStatuses)[number];
 export type CustomerOrder = {
+  fulfillmentType?: 'TABLE' | 'TAKEAWAY';
   id: string;
   orderNumber: number;
   status: OrderStatus;

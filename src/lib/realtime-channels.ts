@@ -8,3 +8,5 @@ export type OrderEvent = (typeof orderEvents)[number];
 export const serviceEvents = ['serviceCall.created', 'serviceCall.updated'] as const;
 export const realtimeEvents = [...orderEvents, ...serviceEvents];
 export type RealtimeEvent = (typeof realtimeEvents)[number];
+
+export const takeawayChannel = (id: string) => `private-takeaway-session-${objectIdSchema.parse(id)}`;

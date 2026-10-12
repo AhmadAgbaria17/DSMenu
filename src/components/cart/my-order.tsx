@@ -14,21 +14,22 @@ import { SubmitOrder, CustomerOrders } from '@/components/orders/customer-orders
 import { useOrders } from '@/components/orders/orders-provider';
 import { CartNote } from './cart-note';
 
-export function MyOrderButton({ currency, tableNumber, onOpen }: { currency: string; tableNumber: number; onOpen: () => void }) {
+export function MyOrderButton({ currency, tableNumber, onOpen }: { currency: string; tableNumber: number | null; onOpen: () => void }) {
   const cart = useCart();
   const locale = useLocale();
   const t = useTranslations('Shopping');
   const menu = useTranslations('Menu');
+  const takeaway = useTranslations('Takeaway');
   return <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-[#f8f7f2] to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5">
     <button type="button" disabled={!cart.ready} onClick={onOpen} data-testid="my-order-button"
       className="pointer-events-auto mx-auto flex min-h-16 w-full max-w-lg items-center justify-between gap-3 rounded-2xl bg-emerald-950 px-5 py-3 text-white shadow-xl shadow-emerald-950/15">
-      <span className="flex items-center gap-3"><span className="grid min-w-10 place-items-center rounded-xl bg-white/15 px-2 py-2 font-bold tabular-nums">{cart.count}</span><span className="text-start"><span className="block font-bold">{t('myOrder')}</span><span className="text-xs text-emerald-100">{menu('table', { number: tableNumber })} · {t('itemCount', { count: cart.count })}</span></span></span>
+      <span className="flex items-center gap-3"><span className="grid min-w-10 place-items-center rounded-xl bg-white/15 px-2 py-2 font-bold tabular-nums">{cart.count}</span><span className="text-start"><span className="block font-bold">{t('myOrder')}</span><span className="text-xs text-emerald-100">{tableNumber === null ? takeaway('title') : menu('table', { number: tableNumber })} · {t('itemCount', { count: cart.count })}</span></span></span>
       <bdi className="font-bold">{formatMoney(cart.subtotal, locale, currency)}</bdi>
     </button>
   </div>;
 }
 
-export function MyOrderDrawer({ restaurant, table, onClose }: { restaurant: PublicRestaurant; table: PublicTable; onClose: () => void }) {
+export function MyOrderDrawer({ restaurant, table, onClose }: { restaurant: PublicRestaurant; table: PublicTable | null; onClose: () => void }) {
   const cart = useCart();
   const orders = useOrders();
   const orderText = useTranslations('Orders');
@@ -36,9 +37,10 @@ export function MyOrderDrawer({ restaurant, table, onClose }: { restaurant: Publ
   const locale = useLocale();
   const t = useTranslations('Shopping');
   const menu = useTranslations('Menu');
+  const takeaway = useTranslations('Takeaway');
   return <Sheet title={t('myOrder')} onClose={onClose}>
     <div className="p-5 sm:p-7">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><p className="text-lg font-bold"><bdi>{restaurant.name}</bdi></p><span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold">{menu('table', { number: table.tableNumber })}</span></div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><p className="text-lg font-bold"><bdi>{restaurant.name}</bdi></p><span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold">{table ? menu('table', { number: table.tableNumber }) : takeaway('title')}</span></div>
       {cart.lines.length === 0 ? <div className="py-14 text-center"><p className="text-xl font-bold">{t('emptyCart')}</p><p className="mt-3 text-stone-600">{t('emptyCartHint')}</p></div>
         : <ul className="divide-y divide-stone-200">{cart.lines.map(line => {
           const name = localizedName(line.product, locale);

@@ -1,9 +1,8 @@
 import 'server-only';
-import { optionGroupsSchema, resolveOptions } from '@/lib/product-options';
+import { priceOrder } from './order-pricing';
 import mongoose from 'mongoose';
-import { Category, Order, Product, TableSession } from '@/models';
+import { Order, TableSession } from '@/models';
 import { connectMongo } from '@/lib/mongodb';
-import { moneySchema } from '@/lib/validators/common';
 import { orderInput } from '@/lib/validators/orders';
 import { orderFingerprint } from '@/lib/customer-security';
 import { CustomerRequestError, isDuplicateKey } from '@/lib/customer-errors';
@@ -39,22 +38,7 @@ export async function submitCustomerOrder(slug: string, tableValue: string, toke
       if (existing.requestFingerprint !== fingerprint) throw new CustomerRequestError('REQUEST_CONFLICT', 409);
       return { order: orderDto(existing), created: false, restaurantId: String(target.restaurant._id), visitId: String(visit._id) };
     }
-    const products = await Product.find({ restaurantId: target.restaurant._id, _id: { $in: input.items.map(item => item.productId) }, isArchived: false, isAvailable: true }).session(transaction).lean();
-    const categories = await Category.find({ restaurantId: target.restaurant._id, _id: { $in: products.map(product => product.categoryId) }, isActive: true }).select('_id').session(transaction).lean();
-    const categoryIds = new Set(categories.map(category => String(category._id)));
-    const catalog = new Map(products.filter(product => categoryIds.has(String(product.categoryId))).map(product => [String(product._id), product]));
-    const invalid = [...new Set(input.items.filter(item => !catalog.has(item.productId)).map(item => item.productId))];
-    if (invalid.length) throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, invalid);
-    const items = input.items.map(item => {
-      const product = catalog.get(item.productId)!;
-      let customization;
-      try { customization = resolveOptions(optionGroupsSchema.parse(product.optionGroups ?? []), item.selections); }
-      catch { throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, [item.productId]); }
-      const price = product.price + customization.optionsTotal;
-      return { ...customization, basePrice: product.price, productId: product._id, nameAr: product.nameAr, nameHe: product.nameHe, nameEn: product.nameEn, price, quantity: item.quantity, notes: item.note, itemTotal: price * item.quantity };
-    });
-    const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
-    if (!moneySchema.safeParse(subtotal).success || items.some(item => !moneySchema.safeParse(item.price).success || !moneySchema.safeParse(item.itemTotal).success)) throw new CustomerRequestError('ORDER_LIMIT', 422);
+    const { items, subtotal } = await priceOrder(input, target.restaurant._id, transaction);
     // Writing this same visit document serializes competing allocations and staff closure.
     const allocated = await TableSession.findOneAndUpdate({
       ...credentialFilter(target, token), _id: visit._id, status: 'ACTIVE', nextOrderNumber: { $lt: MAX_ORDERS_PER_VISIT },

@@ -24,9 +24,10 @@ export async function startRealtimeTransport() {
       const event = JSON.parse(Buffer.concat(chunks).toString()) as Event;
       assert.ok(request.url?.startsWith('/apps/123/events?'));
       const visit = event.channels.find(channel => channel.startsWith('private-table-session-'))?.slice('private-table-session-'.length);
+      const takeaway = event.channels.find(channel => channel.startsWith('private-takeaway-session-'))?.slice('private-takeaway-session-'.length);
       const committed = event.name.startsWith('serviceCall.')
         ? await ServiceCall.find({ tableSessionId: visit }).select('_id status').lean()
-        : await Order.find({ tableSessionId: visit }).select('_id status').lean();
+        : await Order.find(takeaway ? { takeawaySessionId: takeaway } : { tableSessionId: visit }).select('_id status').lean();
       realtimeTest.events.push({ ...event, committed: committed.map(order => ({ id: String(order._id), status: order.status })) });
       if (realtimeTest.failNext) { realtimeTest.failNext = false; response.writeHead(503); response.end('{}'); return; }
       realtimeTest.broadcast(event);

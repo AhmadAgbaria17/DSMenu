@@ -688,3 +688,8 @@ English tablet and Arabic mobile report screenshots were visually reviewed. Test
 ### Super Admin
 
 Platform owners can create restaurants and their initial OWNER through `/admin`, then activate/deactivate restaurants without deleting history. Bootstrap the first platform account using `npm run create-super-admin`; see [setup, security and manual checks](docs/SUPER-ADMIN.md). Existing employee CLI tools remain available.
+
+
+### Takeaway and grouped Products
+
+Takeaway uses `/r/{slug}?mode=takeaway` with a separate secure visit and QR. Products now appear in category grids. **Run `npm run db:indexes` before enabling takeaway** to safely replace the legacy table-only uniqueness constraints. See [architecture, deployment and manual checks](docs/TAKEAWAY-AND-PRODUCT-GRID.md).

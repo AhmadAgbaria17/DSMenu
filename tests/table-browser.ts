@@ -20,7 +20,9 @@ export async function runTableBrowserChecks(base: string, fixture: StaffFixture)
     await page.goto(`${base}/dashboard/tables`); await page.getByRole('button', { name: 'Add Table', exact: true }).click();
     await page.getByLabel('Table Number', { exact: true }).fill('16'); await page.getByLabel('Table Label', { exact: true }).fill('Window'); await page.getByRole('button', { name: 'Save', exact: true }).click();
     const row = page.getByTestId('table-16'); await expect(row).toContainText('Available');
-    await page.goto(`${base}/dashboard/qr-codes`); const qr = page.locator('#table-16'); await expect(qr.getByTestId('qr-url')).toHaveText(`${base}/r/salt?table=16`);
+    await page.goto(`${base}/dashboard/qr-codes`); const qr = page.locator('#table-16');
+    // Wait for the streamed route to settle; assert uniqueness before using strict locators.
+    await expect(qr).toHaveCount(1); await expect(qr.getByTestId('qr-url')).toHaveText(`${base}/r/salt?table=16`);
     await qr.getByRole('button', { name: 'Copy Link', exact: true }).click(); assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `${base}/r/salt?table=16`);
     const download = page.waitForEvent('download'); await qr.getByRole('link', { name: 'Download PNG', exact: true }).click(); assert.equal((await download).suggestedFilename(), 'salt-table-16-qr.png');
     const printPage = page.waitForEvent('popup'); await qr.getByRole('link', { name: 'Print Card', exact: true }).click(); const print = await printPage; await print.waitForLoadState('load');

@@ -7,7 +7,7 @@ export const MAX_QUANTITY = 99;
 export const MAX_NOTE_LENGTH = 300;
 export const MAX_CART_LINES = 100;
 export const noteSchema = z.string().trim().max(MAX_NOTE_LENGTH);
-export type CartScope = { restaurantId: string; tableNumber: number };
+export type CartScope = { restaurantId: string } & ({ tableNumber: number; takeawayVisitId?: never } | { takeawayVisitId: string; tableNumber?: never });
 export type CartItem = { productId: string; quantity: number; note: string; selections?: Selection[] };
 export type CartLine = CartItem & { product: PublicProduct; itemTotal: number; unitPrice: number; needsReview: boolean; optionGroups: OptionSnapshot[] };
 export type CartState = { items: CartItem[]; hydrated: boolean; lastConfirmedRequestId?: string };
@@ -22,12 +22,13 @@ export type CartAction =
 export const initialCart: CartState = { items: [], hydrated: false };
 const storedItemSchema = z.object({ productId: objectIdSchema, quantity: z.number().finite(), note: z.string(), selections: selectionsSchema.optional() });
 const storedCartSchema = z.object({
-  version: z.literal(1), restaurantId: objectIdSchema, tableNumber: tableNumberSchema,
+  version: z.literal(1), restaurantId: objectIdSchema, tableNumber: tableNumberSchema.optional(), takeawayVisitId: objectIdSchema.optional(),
   items: z.array(z.unknown()).max(MAX_CART_LINES),
   lastConfirmedRequestId: z.uuid().optional(),
 });
 
 export function cartStorageKey(scope: CartScope) {
+  if (scope.takeawayVisitId) return `dsmenu-cart:v1:${objectIdSchema.parse(scope.restaurantId)}:takeaway:${objectIdSchema.parse(scope.takeawayVisitId)}`;
   return `dsmenu-cart:v1:${objectIdSchema.parse(scope.restaurantId)}:${tableNumberSchema.parse(scope.tableNumber)}`;
 }
 export function cartLineKey(item: Pick<CartItem, 'productId' | 'note' | 'selections'>) {
@@ -62,7 +63,7 @@ export function parseCart(raw: string | null, scope: CartScope, products: Public
     // Bound work on untrusted storage before parsing it.
     if (raw.length > 200_000) return { items: [] as CartItem[], recovered: true };
     const parsed = storedCartSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success || parsed.data.restaurantId !== scope.restaurantId || parsed.data.tableNumber !== scope.tableNumber) {
+    if (!parsed.success || parsed.data.restaurantId !== scope.restaurantId || parsed.data.tableNumber !== scope.tableNumber || parsed.data.takeawayVisitId !== scope.takeawayVisitId) {
       return { items: [] as CartItem[], recovered: true };
     }
     const items = reconcileCart(parsed.data.items, products);

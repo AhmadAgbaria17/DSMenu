@@ -18,10 +18,10 @@ type CartContextValue = ReturnType<typeof getCartSummary> & {
 };
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ restaurantId, tableNumber, products, children }: {
-  restaurantId: string; tableNumber: number | null; products: PublicProduct[]; children: ReactNode;
+export function CartProvider({ restaurantId, tableNumber, takeawayVisitId, products, children }: {
+  restaurantId: string; tableNumber: number | null; takeawayVisitId?: string; products: PublicProduct[]; children: ReactNode;
 }) {
-  const scope = useMemo(() => tableNumber === null ? null : { restaurantId, tableNumber }, [restaurantId, tableNumber]);
+  const scope = useMemo(() => takeawayVisitId ? { restaurantId, takeawayVisitId } : tableNumber === null ? null : { restaurantId, tableNumber }, [restaurantId, tableNumber, takeawayVisitId]);
   const key = scope ? cartStorageKey(scope) : null;
   const [retained, setRetained] = useState<PublicProduct[]>([]);
   // Keep failed/pending lines visible even if a later server render changes availability.

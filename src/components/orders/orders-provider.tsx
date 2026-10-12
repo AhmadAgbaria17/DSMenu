@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import { useCart } from '@/components/cart/cart-provider';
-import { customerApiPath } from '@/lib/customer-path';
+import { customerApiPath, takeawayApiPath } from '@/lib/customer-path';
 import { parsePending, pendingStorageKey, type PendingSubmission } from '@/lib/submission';
 import { customerErrorCodes, type CustomerError, type CustomerOrder, type OrdersResponse } from '@/types/orders';
 import type { CartScope } from '@/lib/cart';
@@ -36,12 +36,12 @@ type OrdersContextValue = {
 };
 const OrdersContext = createContext<OrdersContextValue | null>(null);
 
-export function OrdersProvider({ slug, restaurantId, tableNumber, children }: {
-  slug: string; restaurantId: string; tableNumber: number | null; children: ReactNode;
+export function OrdersProvider({ slug, restaurantId, tableNumber, takeawayVisitId, children }: {
+  slug: string; restaurantId: string; tableNumber: number | null; takeawayVisitId?: string; children: ReactNode;
 }) {
   const cart = useCart();
-  const path = tableNumber === null ? null : customerApiPath(slug, tableNumber);
-  const scope: CartScope | null = tableNumber === null ? null : { restaurantId, tableNumber };
+  const path = takeawayVisitId ? takeawayApiPath(slug) : tableNumber === null ? null : customerApiPath(slug, tableNumber);
+  const scope: CartScope | null = takeawayVisitId ? { restaurantId, takeawayVisitId } : tableNumber === null ? null : { restaurantId, tableNumber };
   const [serviceRevision, setServiceRevision] = useState(0);
   const [visitId, setVisitId] = useState<string | null>(null);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
@@ -63,8 +63,9 @@ export function OrdersProvider({ slug, restaurantId, tableNumber, children }: {
       setConnecting(true);
       try {
         // Establish only on entry or explicit retry, never as part of Send Order.
-        const visit = await callApi<{ visitId: string }>(`${path}/session`, {});
+        const visit = await callApi<{ visitId: string }>(`${path}/session`, takeawayVisitId ? undefined : {});
         const history = await callApi<OrdersResponse>(`${path}/orders`);
+        if (takeawayVisitId && visit.visitId !== takeawayVisitId) throw new ApiFailure({ code: 'VISIT_CHANGED' }, false);
         if (visit.visitId !== history.visitId) throw new ApiFailure({ code: 'SESSION_CLOSED' }, false);
         setVisitId(visit.visitId); setOrders(history.orders); setError(null);
         setRealtime(history.realtime ?? null);
@@ -73,7 +74,7 @@ export function OrdersProvider({ slug, restaurantId, tableNumber, children }: {
     };
     connection.current = operation();
     return connection.current;
-  }, [path]);
+  }, [path, takeawayVisitId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +133,7 @@ export function OrdersProvider({ slug, restaurantId, tableNumber, children }: {
     sending.current = true; historySequence.current++; setBusy(true); setError(null); setConfirmed(null);
     cart.retainItems(attempt.input.items.map(item => item.productId)); cart.setLocked(true);
     try {
-      const result = await callApi<{ order: CustomerOrder }>(`${path}/orders`, attempt.input);
+      const result = await callApi<{ order: CustomerOrder }>(`${path}/orders`, takeawayVisitId ? { ...attempt.input, takeawayVisitId } : attempt.input);
       cart.dispatch({ type: 'confirmed', items: attempt.input.items, clientRequestId: attempt.input.clientRequestId });
       setConfirmed(result.order);
       setOrders(previous => [result.order, ...previous.filter(order => order.id !== result.order.id)].sort((a, b) => b.orderNumber - a.orderNumber));

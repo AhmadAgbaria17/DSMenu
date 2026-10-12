@@ -158,6 +158,9 @@ async function main() {
     const { runPlatformHttpChecks } = await import('./platform-http');
     const platformFixture = await runPlatformHttpChecks(base, staffFixture);
     if (process.argv.includes('--browser')) { const { runPlatformBrowserChecks } = await import('./platform-browser'); await runPlatformBrowserChecks(base, platformFixture); }
+    const { runTakeawayHttpChecks } = await import('./takeaway-http');
+    await runTakeawayHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser') || process.argv.includes('--takeaway-browser')) { const { runTakeawayBrowserChecks } = await import('./takeaway-browser'); await runTakeawayBrowserChecks(base, staffFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

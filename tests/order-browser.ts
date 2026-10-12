@@ -104,7 +104,7 @@ export async function runOrderBrowserChecks(base: string) {
     await addBurger();
     await TableSession.updateOne({ _id: visit._id }, { $set: { status: 'CLOSED', closedAt: new Date() } });
     await page.getByTestId('send-order').click();
-    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('This table visit has closed');
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('This visit has closed. No new order was added. Check with staff before starting a new visit.');
     await expect(page.getByTestId('cart-line')).toHaveCount(1);
     assert.equal(await Order.countDocuments(scope), 3);
     assert.equal(await TableSession.countDocuments({ tableId: table._id }), 1);

@@ -20,7 +20,7 @@ export async function getManagedTables(): Promise<TableSnapshot> {
     Order.find({ ...scope, status: { $in: activeOrderStatuses } }).select('tableSessionId').lean(),
     ServiceCall.find({ ...scope, status: { $in: ['PENDING', 'ACKNOWLEDGED'] } }).select('tableSessionId').lean(),
   ]);
-  const count = (rows: { tableSessionId: mongoose.Types.ObjectId }[]) => {
+  const count = (rows: { tableSessionId?: mongoose.Types.ObjectId | null }[]) => {
     const map = new Map<string, number>();
     for (const row of rows) { const key = String(row.tableSessionId); map.set(key, (map.get(key) ?? 0) + 1); }
     return map;

@@ -18,7 +18,7 @@ export async function getRestaurantOrders(): Promise<LiveOrdersSnapshot> {
   const all = [...active, ...history];
   const tables = await Table.find({ ...scope, _id: { $in: all.map(order => order.tableId) } }).select('_id tableNumber').lean();
   const numbers = new Map(tables.map(table => [String(table._id), table.tableNumber]));
-  return { fetchedAt: new Date().toISOString(), realtime: realtimeConfig(restaurantChannel(staff.restaurantId)), orders: all.map(order => ({ ...orderDto(order), tableNumber: numbers.get(String(order.tableId)) ?? null, tableSessionId: String(order.tableSessionId), updatedAt: order.updatedAt.toISOString(), notes: order.notes })) };
+  return { fetchedAt: new Date().toISOString(), realtime: realtimeConfig(restaurantChannel(staff.restaurantId)), orders: all.map(order => ({ ...orderDto(order), tableNumber: numbers.get(String(order.tableId)) ?? null, tableSessionId: order.tableSessionId ? String(order.tableSessionId) : null, ...(order.fulfillmentType === 'TAKEAWAY' ? { takeawaySessionId: String(order.takeawaySessionId), customerName: order.customerName ?? '', customerPhone: order.customerPhone ?? '' } : {}), updatedAt: order.updatedAt.toISOString(), notes: order.notes })) };
 }
 export async function updateOrderStatus(id: string, payload: unknown) {
   const staff = await requireStaffApi();
@@ -34,6 +34,6 @@ export async function updateOrderStatus(id: string, payload: unknown) {
     if (!await Order.exists(scope)) throw new StaffApiError('NOT_FOUND', 404);
     throw new StaffApiError('CONFLICT', 409);
   }
-  await publishOrderChange(staff.restaurantId, String(order.tableSessionId), 'order.status.updated');
+  await publishOrderChange(staff.restaurantId, String(order.takeawaySessionId ?? order.tableSessionId), 'order.status.updated', order.fulfillmentType === 'TAKEAWAY' ? 'TAKEAWAY' : 'TABLE');
   return orderDto(order);
 }
