@@ -9,6 +9,7 @@ import { isDuplicateKey } from '@/lib/customer-errors';
 import { appOrigin } from '@/lib/env';
 import { tableQrUrl } from '@/lib/qr';
 import { invalidateMenu } from './menu-management';
+import { readSessionBill } from './table-bill';
 import type { TableSnapshot } from '@/types/tables';
 
 export async function getManagedTables(): Promise<TableSnapshot> {
@@ -57,13 +58,15 @@ export async function closeTableVisit(id: string, payload: unknown) {
   await mongoose.connection.transaction(async session => {
     const table = await Table.findOneAndUpdate({ _id: id, restaurantId: staff.restaurantId }, { $inc: { lifecycleVersion: 1 } }, { session });
     if (!table) throw new StaffApiError('NOT_FOUND', 404);
-    const scope = { restaurantId: staff.restaurantId, tableId: id, tableSessionId: parsed.data.sessionId };
     // The visit write conflicts with order/service creation. Transaction retries see
     // committed requests before allowing closure; a stale ID cannot close a new visit.
     const visit = await TableSession.findOneAndUpdate({ _id: parsed.data.sessionId, restaurantId: staff.restaurantId, tableId: id, status: 'ACTIVE' }, { $set: { status: 'CLOSED', closedAt: new Date() } }, { session });
     if (!visit) throw new StaffApiError('CONFLICT', 409);
-    if (await Order.exists({ ...scope, status: { $in: activeOrderStatuses } }).session(session)) throw new StaffApiError('ACTIVE_ORDERS', 409);
-    if (await ServiceCall.exists({ ...scope, status: { $in: ['PENDING', 'ACKNOWLEDGED'] } }).session(session)) throw new StaffApiError('UNRESOLVED_CALLS', 409);
+    const bill = await readSessionBill(staff.restaurantId, id, parsed.data.sessionId, session);
+    if (bill.activeOrders) throw new StaffApiError('ACTIVE_ORDERS', 409);
+    if (bill.unresolvedCalls) throw new StaffApiError('UNRESOLVED_CALLS', 409);
+    // A revision is only a stale-review guard, never an authoritative client total.
+    if (parsed.data.billRevision && parsed.data.billRevision !== bill.revision) throw new StaffApiError('CONFLICT', 409);
   }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
   await invalidateMenu(staff.restaurantId); return { closed: true };
 }

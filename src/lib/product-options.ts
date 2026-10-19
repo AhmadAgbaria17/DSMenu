@@ -3,7 +3,7 @@ import { moneySchema } from './validators/common';
 
 const names = { nameAr: z.string().trim().min(1).max(160), nameHe: z.string().trim().min(1).max(160), nameEn: z.string().trim().min(1).max(160) };
 export const optionSchema = z.object({ id: z.uuid(), ...names, priceDelta: moneySchema, isDefault: z.boolean(), isActive: z.boolean(), sortOrder: z.number().int().min(0).max(100000) }).strict();
-export const optionGroupSchema = z.object({ id: z.uuid(), ...names, type: z.enum(['SINGLE', 'MULTIPLE', 'INCLUDED']), required: z.boolean(), minSelections: z.number().int().min(0).max(20), maxSelections: z.number().int().min(1).max(20), sortOrder: z.number().int().min(0).max(100000), isActive: z.boolean(), options: z.array(optionSchema).min(1).max(20) }).strict();
+export const optionGroupSchema = z.object({ sourceTemplateId: z.string().regex(/^[a-f0-9]{24}$/i).optional(), id: z.uuid(), ...names, type: z.enum(['SINGLE', 'MULTIPLE', 'INCLUDED']), required: z.boolean(), minSelections: z.number().int().min(0).max(20), maxSelections: z.number().int().min(1).max(20), sortOrder: z.number().int().min(0).max(100000), isActive: z.boolean(), options: z.array(optionSchema).min(1).max(20) }).strict();
 export const optionGroupsSchema = z.array(optionGroupSchema).max(10).superRefine((groups, ctx) => {
   const ids = groups.flatMap(g => [g.id, ...g.options.map(o => o.id)]);
   if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', message: 'Duplicate option/group IDs.' });

@@ -8,3 +8,5 @@ export { Order } from './Order';
 export { ServiceCall } from './ServiceCall';
 
 export { TakeawaySession } from './TakeawaySession';
+
+export { ProductOptionTemplate } from './ProductOptionTemplate';

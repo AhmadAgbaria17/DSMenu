@@ -693,3 +693,11 @@ Platform owners can create restaurants and their initial OWNER through `/admin`,
 ### Takeaway and grouped Products
 
 Takeaway uses `/r/{slug}?mode=takeaway` with a separate secure visit and QR. Products now appear in category grids. **Run `npm run db:indexes` before enabling takeaway** to safely replace the legacy table-only uniqueness constraints. See [architecture, deployment and manual checks](docs/TAKEAWAY-AND-PRODUCT-GRID.md).
+
+### Saved option groups
+
+Products links to `/dashboard/option-templates`. Save existing product groups as templates or copy saved groups into new/existing products, with independent IDs and no live synchronization. The existing `npm run db:indexes` command creates the new collection's tenant/name index. See [workflow, security and file manifest](docs/OPTION-TEMPLATES.md).
+
+### Table session bills
+
+Tables → Close Session opens a snapshot-based bill before confirmation. Active orders and unresolved service calls block closure; cancelled orders are displayed but excluded from the total. No payment is processed or verified. See [workflow, safety rules and manual checks](docs/TABLE-SESSION-BILL.md).

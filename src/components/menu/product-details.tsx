@@ -36,7 +36,7 @@ export function ProductDetails({ product, currency, onClose, onAdded }: {
   const full = !existing && cart.lines.length >= MAX_CART_LINES;
   const canAdd = validOptions && cart.ready && cart.canOrder && !cart.locked && product.isAvailable && quantity <= remaining && !full && noteSchema.safeParse(note).success;
   return <Sheet title={name} onClose={onClose}>
-    <MenuImage image={product.image} alt={name} className="aspect-[16/8] w-full" />
+    <MenuImage fit="contain" image={product.image} alt={name} className="aspect-[16/8] w-full" />
     <form className="space-y-6 p-5 sm:p-7" onSubmit={event => {
       event.preventDefault();
       if (!canAdd) return;

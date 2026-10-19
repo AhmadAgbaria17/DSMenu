@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { AuthClient, type StaffFixture } from './staff-http';
+import { createStaffUser } from '../src/lib/staff-users';
+import { ProductOptionTemplate, Product, Category, Order } from '../src/models';
+import { optionFixture } from './option-fixture';
+import { defaultSelections, type OptionGroup } from '../src/lib/product-options';
+import type { OptionTemplate } from '../src/lib/option-templates';
+export async function runTemplateHttpChecks(base: string, fixture: StaffFixture) {
+  await createStaffUser({ restaurant: 'salt', name: 'Template Staff', email: 'templates@salt.local', password: fixture.password, role: 'STAFF' });
+  await createStaffUser({ restaurant: 'other', name: 'Template Other', email: 'templates@other.local', password: fixture.password, role: 'STAFF' });
+  const staff = new AuthClient(base); await staff.login('templates@salt.local', fixture.password);
+  const other = new AuthClient(base); await other.login('templates@other.local', fixture.password);
+  const request = (client: AuthClient, path: string, method = 'GET', body?: unknown) => client.request('/api/dashboard/' + path, { method, headers: { Origin: base, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const group = optionFixture()[1]; const input = { templateName: 'Burger Extras HTTP', isActive: true, group };
+  assert.equal((await fetch(base + '/api/dashboard/option-templates')).status, 401);
+  assert.equal((await request(staff, 'option-templates', 'POST', { ...input, restaurantId: fixture.restaurantId })).status, 400);
+  assert.equal((await staff.request('/api/dashboard/option-templates', { method: 'POST', headers: { Origin: 'https://evil.invalid', 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).status, 403);
+  const created = await request(staff, 'option-templates', 'POST', input); assert.equal(created.status, 200);
+  const { id } = await created.json() as { id: string };
+  const list = await (await request(staff, 'option-templates')).json() as OptionTemplate[];
+  const template = list.find(row => row.id === id)!; assert.equal(template.templateName, input.templateName);
+  assert.ok(!(await (await request(other, 'option-templates')).json() as OptionTemplate[]).some(row => row.id === id));
+  for (const [path, method, body] of [
+    [id + '/use', 'POST', undefined], [id, 'PUT', input], [id, 'DELETE', undefined], [id, 'POST', { templateName: 'Stolen' }],
+  ] as const) assert.equal((await request(other, 'option-templates/' + path, method, body)).status, 404);
+  assert.equal((await request(staff, 'option-templates/bad/use', 'POST')).status, 404);
+  const copy = async () => {
+    const response = await request(staff, 'option-templates/' + id + '/use', 'POST'); assert.equal(response.status, 200);
+    return (await response.json() as { group: OptionGroup }).group;
+  };
+  const first = await copy(); const second = await copy();
+  assert.notEqual(first.id, second.id); assert.notEqual(first.id, template.group.id);
+  first.options.forEach((o, n) => { assert.notEqual(o.id, second.options[n].id); assert.notEqual(o.id, template.group.options[n].id); });
+  first.options[0].priceDelta = 600;
+  const vegetables = optionFixture()[0];
+  const savedVegetables = await request(staff, 'option-templates', 'POST', { templateName: 'Vegetables HTTP', isActive: true, group: vegetables });
+  const vegId = (await savedVegetables.json() as { id: string }).id;
+  const vegCopy = (await (await request(staff, 'option-templates/' + vegId + '/use', 'POST')).json() as { group: OptionGroup }).group;
+  const category = await Category.findOne({ restaurantId: fixture.restaurantId, isActive: true }).orFail();
+  const productData = { nameAr: 'Template Burger', nameHe: 'Template Burger', nameEn: 'Template Burger HTTP', descriptionAr: '', descriptionHe: '', descriptionEn: '', categoryId: String(category._id), price: '48.00', sortOrder: 999, isAvailable: true, isFeatured: false, isArchived: false, optionGroups: [vegCopy, first] };
+  const productResponse = await request(staff, 'products', 'POST', productData); assert.equal(productResponse.status, 200);
+  const productId = (await productResponse.json() as { id: string }).id;
+  const before = (await Product.findById(productId).orFail()).optionGroups.toObject();
+  assert.equal((await ProductOptionTemplate.findById(id).orFail()).group.options[0].priceDelta, 500);
+  const visit = await fetch(base + '/api/r/salt/tables/7/session', { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(visit.status, 200); const cookie = visit.headers.get('set-cookie')!.split(';')[0];
+  const selections = defaultSelections([vegCopy, first]); selections[1].optionIds = [first.options[0].id];
+  const send = async (choices = selections) => fetch(base + '/api/r/salt/tables/7/orders', { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json', cookie }, body: JSON.stringify({ clientRequestId: randomUUID(), items: [{ productId, quantity: 1, note: '', selections: choices }] }) });
+  const ordered = await send(); assert.equal(ordered.status, 200);
+  const order = (await ordered.json() as { order: { id: string; subtotal: number } }).order; assert.equal(order.subtotal, 5400);
+  const snapshot = (await Order.findById(order.id).lean().orFail()).items;
+  assert.equal((await send(defaultSelections([vegetables, template.group]))).status, 422);
+  const changed = structuredClone(input); changed.group.options[0].priceDelta = 900;
+  assert.equal((await request(staff, 'option-templates/' + id, 'PUT', changed)).status, 200);
+  assert.deepEqual((await Product.findById(productId).orFail()).optionGroups.toObject(), before);
+  assert.equal((await copy()).options[0].priceDelta, 900);
+  const duplicate = await request(staff, 'option-templates/' + id, 'POST', { templateName: 'Duplicated extras' }); assert.equal(duplicate.status, 200);
+  assert.equal((await request(staff, 'option-templates/' + id, 'PUT', { ...changed, isActive: false })).status, 200);
+  assert.equal((await request(staff, 'option-templates/' + id + '/use', 'POST')).status, 404);
+  assert.equal((await request(staff, 'option-templates/' + id, 'DELETE')).status, 200);
+  assert.deepEqual((await Product.findById(productId).orFail()).optionGroups.toObject(), before);
+  assert.deepEqual((await Order.findById(order.id).lean().orFail()).items, snapshot);
+  assert.equal((await request(staff, 'products/' + productId, 'PUT', productData)).status, 200, 'deleted provenance does not prevent editing independent product');
+  assert.equal((await send()).status, 200, 'product remains authoritative after deletion');
+  console.log('PASS: option template tenant isolation, CRUD/duplicate/deactivation, fresh IDs, multiple independent copies, saved existing groups, product-authoritative pricing and historical preservation.');
+}

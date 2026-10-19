@@ -4,14 +4,14 @@ import Image from 'next/image';
 import { useState } from 'react';
 import type { PublicImage } from '@/types/menu';
 
-export function MenuImage({ image, alt, className = '', priority = false }: {
-  image: PublicImage | null; alt: string; className?: string; priority?: boolean;
+export function MenuImage({ image, alt, className = '', priority = false, fit = 'cover' }: {
+  image: PublicImage | null; alt: string; className?: string; priority?: boolean; fit?: 'cover' | 'contain';
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const src = image?.url;
   return <div className={`relative overflow-hidden bg-[#eeeade] ${className}`}>
     {src && src !== failedSource
-      ? <Image src={src} alt={alt} fill sizes="(max-width: 640px) 100vw, 600px" className="object-cover" unoptimized
+      ? <Image src={src} alt={alt} fill sizes="(max-width: 640px) 100vw, 600px" className={fit === 'contain' ? 'object-contain' : 'object-cover'} unoptimized
           loading={priority ? 'eager' : 'lazy'} onError={() => setFailedSource(src)} />
       : <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(ellipse_at_top_right,#ded9c6,transparent_70%)]" aria-hidden="true">
           <div className="grid size-20 place-items-center rounded-full border border-stone-400/20 bg-white/20 shadow-[0_0_0_12px_#ffffff25]">

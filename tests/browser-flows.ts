@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, expect } from '@playwright/test';
 import { mockRealtime } from './realtime-transport';
 import { cartStorageKey, serializeCart } from '../src/lib/cart';
+import { checkProductImageFraming } from './product-image-browser';
 import { checkHorizontalMenu } from './horizontal-menu';
 
 export async function runBrowserChecks(base: string, restaurantId: string, productId: string, unavailableId: string,
@@ -207,6 +208,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await page.reload();
     await page.getByRole('button', { name: 'View Classic Burger', exact: true }).first().scrollIntoViewIfNeeded();
     await expect(page.getByRole('button', { name: 'View Classic Burger', exact: true }).first().locator('img')).toHaveCount(0);
+    await checkProductImageFraming(page, base, productId, changeProduct);
     await changeProduct({ image: null });
     assert.deepEqual(errors, [], 'no browser exceptions or hydration errors');
     console.log('PASS: mobile browser cart, notes, persistence, language switching, tenant/table scope, invalid storage, keyboard dialogs, blocked storage and responsive layouts.');

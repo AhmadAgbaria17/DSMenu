@@ -16,7 +16,7 @@ export function ProductCard({ product, currency, onOpen, canAdd }: {
   const name = localizedName(product, locale);
   return <article data-product-id={product.id} className="group overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm transition hover:border-stone-300">
     <button type="button" onClick={onOpen} className="block w-full text-start" aria-label={t('details', { name })}>
-      <div className="relative"><MenuImage image={product.image} alt={name} className="aspect-[16/9] w-full" />
+      <div className="relative"><MenuImage fit="contain" image={product.image} alt={name} className="aspect-[16/9] w-full" />
         {product.isFeatured && <span className="absolute start-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-amber-900">✦ {menu('featured')}</span>}
         {!product.isAvailable && <span className="absolute inset-x-0 bottom-0 bg-stone-900/85 px-4 py-2 text-center text-sm text-white">{menu('unavailable')}</span>}
       </div>

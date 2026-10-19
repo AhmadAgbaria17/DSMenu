@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { groupManagedProducts } from '@/lib/managed-product-groups';
 import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -18,6 +19,7 @@ export function MenuManagement({ initial, mode }: { initial: ManagedMenu; mode: 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const grid = useTranslations('ProductGrid');
+  const templates = useTranslations('Templates');
   const [archived, setArchived] = useState(false);
   const busy = useRef(false);
   const router = useRouter(); const locale = useLocale(); const t = useTranslations('Management');
@@ -48,6 +50,7 @@ export function MenuManagement({ initial, mode }: { initial: ManagedMenu; mode: 
     <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><h1 className="text-3xl font-bold">{t(mode)}</h1><button type="button" className={actionClass} onClick={() => { setEditing('new'); setMessage(null); }}>{t(mode === 'categories' ? 'addCategory' : 'addProduct')}</button></div>
     <p className="mb-5 text-sm text-stone-600">{t(mode === 'categories' ? 'categoryHint' : 'productHint')}</p>
     {mode === 'products' && <button type="button" aria-pressed={archived} onClick={() => setArchived(!archived)} className="mb-5 min-h-12 rounded-xl border bg-white px-5 font-bold">{t(archived ? 'showCurrent' : 'showArchived')}</button>}
+    {mode === 'products' && <Link href="/dashboard/option-templates" className="mb-5 inline-flex min-h-12 items-center rounded-full border bg-white px-5 font-bold">{templates('title')}</Link>}
     {!editing && feedback}
     {!rows.length && <p className="rounded-2xl border border-dashed p-8 text-center">{t('empty')}</p>}
     {mode === 'categories' ? <div className="space-y-4">{rows.map(renderRow)}</div> : <>

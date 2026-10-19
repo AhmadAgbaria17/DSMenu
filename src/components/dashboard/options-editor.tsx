@@ -2,9 +2,10 @@
 import { useTranslations } from 'next-intl';
 import type { OptionGroup } from '@/lib/product-options';
 import { priceForInput, priceInput } from '@/lib/validators/menu-management';
+import { SaveGroupTemplate } from './template-actions';
 import { inputClass } from './menu-fields';
 
-export function OptionsEditor({ groups, onChange, disabled }: { groups: OptionGroup[]; onChange: (groups: OptionGroup[]) => void; disabled: boolean }) {
+export function OptionsEditor({ groups, onChange, disabled, templates = false, singleGroup = false }: { groups: OptionGroup[]; onChange: (groups: OptionGroup[]) => void; disabled: boolean; templates?: boolean; singleGroup?: boolean }) {
   const t = useTranslations('Options');
   const change = (id: string, patch: Partial<OptionGroup>) => onChange(groups.map(g => g.id === id ? { ...g, ...patch } : g));
   return <fieldset disabled={disabled} className="space-y-5"><legend className="mb-3 text-xl font-bold">{t('title')}</legend><p className="text-sm text-stone-600">{t('editorHint')}</p>
@@ -21,7 +22,8 @@ export function OptionsEditor({ groups, onChange, disabled }: { groups: OptionGr
           <div className="flex flex-wrap gap-5">{(['isDefault', 'isActive'] as const).map(field => <label key={field} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={option[field]} onChange={e => update({ [field]: e.target.checked })} />{t(field)}</label>)}<button type="button" className="min-h-11 px-3 text-red-800" onClick={() => { if (window.confirm(t('confirmRemove'))) change(group.id, { options: group.options.filter(o => o.id !== option.id) }); }}>{t('removeOption')}</button></div>
         </fieldset>;
       })}
-      <div className="flex flex-wrap gap-3"><button type="button" disabled={group.options.length >= 20} className="min-h-11 rounded-full border px-4" onClick={() => change(group.id, { options: [...group.options, { id: crypto.randomUUID(), nameAr: '', nameHe: '', nameEn: '', priceDelta: 0, isDefault: group.type === 'INCLUDED', isActive: true, sortOrder: group.options.length }] })}>{t('addOption')}</button><button type="button" className="min-h-11 px-4 text-red-800" onClick={() => { if (window.confirm(t('confirmRemove'))) onChange(groups.filter(g => g.id !== group.id)); }}>{t('removeGroup')}</button></div>
+      <div className="flex flex-wrap gap-3"><button type="button" disabled={group.options.length >= 20} className="min-h-11 rounded-full border px-4" onClick={() => change(group.id, { options: [...group.options, { id: crypto.randomUUID(), nameAr: '', nameHe: '', nameEn: '', priceDelta: 0, isDefault: group.type === 'INCLUDED', isActive: true, sortOrder: group.options.length }] })}>{t('addOption')}</button>{!singleGroup && <button type="button" className="min-h-11 px-4 text-red-800" onClick={() => { if (window.confirm(t('confirmRemove'))) onChange(groups.filter(g => g.id !== group.id)); }}>{t('removeGroup')}</button>}</div>
+      {templates && <SaveGroupTemplate group={group} disabled={disabled} />}
     </fieldset>)}
   </fieldset>;
 }

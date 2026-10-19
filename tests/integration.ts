@@ -161,6 +161,12 @@ async function main() {
     const { runTakeawayHttpChecks } = await import('./takeaway-http');
     await runTakeawayHttpChecks(base, staffFixture);
     if (process.argv.includes('--browser') || process.argv.includes('--takeaway-browser')) { const { runTakeawayBrowserChecks } = await import('./takeaway-browser'); await runTakeawayBrowserChecks(base, staffFixture); }
+    const { runTemplateHttpChecks } = await import('./option-templates-http');
+    await runTemplateHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runTemplateBrowserChecks } = await import('./option-templates-browser'); await runTemplateBrowserChecks(base, staffFixture); }
+    const { runBillHttpChecks } = await import('./table-bill-http');
+    await runBillHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runBillBrowserChecks } = await import('./table-bill-browser'); await runBillBrowserChecks(base, staffFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

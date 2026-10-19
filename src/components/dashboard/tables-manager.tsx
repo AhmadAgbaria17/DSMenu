@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { TableBill } from './table-bill';
 import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Sheet } from '@/components/shared/sheet';
@@ -34,7 +35,7 @@ export function TablesManager({ initial }: { initial: TableSnapshot }) {
       await reload(); setEditing(null); setClosing(null); setMessage('saved');
     } catch { setMessage('failed'); } finally { busy.current = false; setPending(false); }
   }
-  const feedback = message && <p role={message === 'saved' ? 'status' : 'alert'} className="my-4 rounded-xl bg-amber-50 p-4">{t(message)}</p>;
+  const feedback = message && <p role={(message === 'saved' || message === 'sessionClosed') ? 'status' : 'alert'} className="my-4 rounded-xl bg-amber-50 p-4">{t(message)}</p>;
   return <>
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><h1 className="text-3xl font-bold">{t('title')}</h1><div className="flex gap-3"><button className={actionClass} onClick={() => { setMessage(''); setEditing('new'); }}>{t('add')}</button><button className={actionClass} onClick={() => void reload().catch(() => setMessage('failed'))}>{t('refresh')}</button></div></div>
     <p className="mb-5 text-stone-600">{t('immutable')}</p>
@@ -55,6 +56,6 @@ export function TablesManager({ initial }: { initial: TableSnapshot }) {
       {editing !== 'new' && <label className="flex min-h-12 items-center gap-3"><input name="active" type="checkbox" disabled={pending} defaultChecked={editing.isActive} />{t('active')}</label>}
       <button disabled={pending} className={actionClass}>{t(pending ? 'saving' : 'save')}</button>
     </form></Sheet>}
-    {closing && <Sheet title={t('closeVisit')} onClose={() => { if (!pending) setClosing(null); }}><div className="space-y-5 p-6">{feedback}<p>{t('closeConfirm', { number: closing.tableNumber })}</p><p>{t('closeHint')}</p><button disabled={pending} className={actionClass} onClick={() => void mutate(`/${closing.id}/close`, { sessionId: closing.visit?.id }, 'POST')}>{t('confirmClose')}</button></div></Sheet>}
+    {closing?.visit && <TableBill key={closing.visit.id} tableId={closing.id} sessionId={closing.visit.id} onDismiss={() => setClosing(null)} onClosed={async () => { await reload(); setClosing(null); setMessage('sessionClosed'); }} />}
   </>;
 }

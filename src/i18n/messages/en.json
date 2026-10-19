@@ -1,4 +1,6 @@
 {
+  "Bill": {"final":"Final Bill","current":"Current Bill","notice":"This is an order summary. DSMenu does not process or verify payment.","loading":"Loading bill…","failed":"Unable to load or close this visit. Refresh the bill and try again.","changed":"The visit or bill changed. Review the refreshed bill before closing.","activeOrders":"Complete or cancel active orders before closing this table.","calls":"Resolve all service requests before closing this table.","closed":"Session closed successfully.","refresh":"Refresh bill","opened":"Session opened","empty":"No orders in this visit.","excluded":"Subtotal excluded","unit":"Unit Price","lineTotal":"Line Total","subtotal":"Order subtotal","count":"Included orders: {count}","total":"Session Total","cancelledCount":"Cancelled orders excluded: {count}","confirm":"Confirm that the restaurant has finished handling this table. Closing does not verify payment.","back":"Back"},
+  "Templates": {"title":"Saved Option Groups","use":"Use Saved Group","saveAs":"Save as Template","name":"Template Name","create":"Create Template","edit":"Edit Template","duplicate":"Duplicate Template","delete":"Delete Template","deactivate":"Deactivate","activate":"Activate","search":"Search templates","empty":"No saved groups","added":"Template added","already":"Already added","saved":"Template saved","invalid":"Enter a template name and a valid option group.","failed":"Unable to save or load templates. Please try again.","hint":"Templates are independent starting points. Changes affect future copies only.","deleteConfirm":"Delete this template? Groups already copied into products will remain unchanged."},
   "Takeaway": {"title":"Take Away","qr":"Takeaway QR","name":"Name","phone":"Phone number","continue":"Continue to menu","hint":"Enter your name and phone number to place a takeaway order. Pay at the restaurant.","loading":"Please wait…","invalid":"Enter a name (2–100 characters) and a valid phone number (7–15 digits).","failed":"Unable to continue. Please try again.","ready":"Your order is ready for pickup","pickedUp":"Picked up","markPickedUp":"Mark picked up"},
   "ProductGrid": {"search":"Search products","categories":"Product categories","all":"All categories","uncategorized":"Uncategorized","repair":"These products need a valid category. Edit the product to assign one.","count":"{count} products","options":"Options: {count} groups","empty":"No matching products."},
   "Admin": {
@@ -382,6 +384,7 @@
     }
   },
   "Tables": {
+    "sessionClosed": "Session closed successfully.",
     "title": "Tables",
     "add": "Add Table",
     "edit": "Edit Table",
