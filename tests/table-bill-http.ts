@@ -34,17 +34,19 @@ export async function runBillHttpChecks(base: string, fixture: StaffFixture) {
       assert.equal(response.status, 200); return (await response.json() as { order: { id: string } }).order.id;
     };
     const first = await submit(2);
-    for (const status of ['NEW', 'ACCEPTED', 'PREPARING', 'READY'] as const) {
+    for (const status of ['NEW', 'ACCEPTED', 'PREPARING'] as const) {
       await Order.updateOne({ _id: first }, { $set: { status } });
       assert.equal((await get()).canClose, false);
       const blocked = await close(); assert.equal(blocked.status, 409); assert.match(await blocked.text(), /ACTIVE_ORDERS/);
       assert.equal((await TableSession.findById(visit._id).orFail()).status, 'ACTIVE');
     }
-    await Order.updateOne({ _id: first }, { $set: { status: 'SERVED', servedAt: new Date(), notes: 'Order note' } });
-    const second = await submit(); await Order.updateOne({ _id: second }, { $set: { status: 'SERVED', servedAt: new Date() } });
+    await Order.updateOne({ _id: first }, { $set: { status: 'READY', readyAt: new Date(), notes: 'Order note' } });
+    const second = await submit(); await Order.updateOne({ _id: second }, { $set: { status: 'READY', readyAt: new Date() } });
     const cancelled = await submit(); await Order.updateOne({ _id: cancelled }, { $set: { status: 'CANCELLED', cancelledAt: new Date() } });
-    let bill = await get(); assert.equal(bill.orders.length, 3); assert.equal(bill.orderCount, 2); assert.equal(bill.cancelledCount, 1); assert.equal(bill.finalTotal, 15900);
+    let bill = await get(); assert.equal(bill.orders.length, 3); assert.equal(bill.orderCount, 2); assert.equal(bill.cancelledCount, 1); assert.equal(bill.finalTotal, 15900); assert.equal(bill.activeOrders, 0); assert.equal(bill.canClose, true);
     assert.equal(bill.orders[0].items[0].price, 5300); assert.equal(bill.orders[0].items[0].itemTotal, 10600);
+    const readyTables = await (await staff.request('/api/dashboard/tables')).json() as TableSnapshot;
+    assert.equal(readyTables.tables.find(row => row.id === String(table._id))!.visit!.activeOrders, 0, 'READY is excluded from table badges');
     assert.equal(bill.orders[0].items[0].note, 'No mayo'); assert.equal(bill.orders[0].notes, 'Order note');
     assert.equal(bill.orders[0].items[0].optionGroups![0].removed[0].nameEn, 'Tomato');
     assert.equal(bill.orders[0].items[0].optionGroups![1].selected[0].priceDelta, 500);
@@ -62,7 +64,7 @@ export async function runBillHttpChecks(base: string, fixture: StaffFixture) {
     await ServiceCall.updateOne({ _id: call._id }, { $set: { status: 'RESOLVED', resolvedAt: new Date() } });
     bill = await get(); assert.equal(bill.canClose, true);
     // A new order completed between review and confirmation must still require re-review.
-    const later = await submit(); await Order.updateOne({ _id: later }, { $set: { status: 'SERVED', servedAt: new Date() } });
+    const later = await submit(); await Order.updateOne({ _id: later }, { $set: { status: 'READY', readyAt: new Date() } });
     assert.equal((await close({ sessionId: String(visit._id), billRevision: bill.revision })).status, 409);
     bill = await get();
     const storedBefore = await Order.find({ tableSessionId: visit._id }).sort({ _id: 1 }).lean();

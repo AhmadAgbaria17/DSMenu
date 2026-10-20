@@ -284,7 +284,7 @@ The Phase 5, 6, 7 and 8 sections below document the implemented progression. See
 
 ## Phase 5: live orders and private realtime
 
-`/dashboard/orders` now loads authoritative data on the server, groups distinct orders by table visit, and provides large status buttons, age labels, active-status filters and recent history. NEW, ACCEPTED, PREPARING and READY appear in the active queue. SERVED/CANCELLED leave that queue but remain in the database; History shows the latest 100 completed orders by update time. All active orders are loaded; pagination of large active queues is a future scaling improvement. No records are deleted. The customer My Orders view updates automatically and retains its manual refresh button. All UI strings support Arabic/Hebrew/English and logical RTL/LTR layouts.
+`/dashboard/orders` now loads authoritative data on the server, groups distinct orders by table visit, and provides large status buttons, age labels, active-status filters and recent history. NEW and PREPARING appear in the active queue (legacy ACCEPTED is treated as preparing). READY/SERVED/CANCELLED leave that queue but remain in the database; History shows the latest 100 completed orders by update time. All active orders are loaded; pagination of large active queues is a future scaling improvement. No records are deleted. The customer My Orders view updates automatically and retains its manual refresh button. All UI strings support Arabic/Hebrew/English and logical RTL/LTR layouts.
 
 ### Pusher setup and deployment
 
@@ -319,13 +319,15 @@ The service exposes tenant-scoped `getRestaurantOrders()` and `updateOrderStatus
 
 Allowed transitions are centralized in `src/lib/order-flow.ts`:
 
+Multiple NEW table orders now share one operational card and transition together; a lightweight preparation ID preserves membership after starting. See [Preparation groups](docs/PREPARATION-GROUPS.md) for transactional boundaries, compatibility and testing. Historical Orders and billing remain individual.
+
 ```text
-NEW → ACCEPTED → PREPARING → READY → SERVED
+NEW → PREPARING → READY
   ↘ CANCELLED      
-ACCEPTED → CANCELLED
+Legacy ACCEPTED → READY or CANCELLED
 ```
 
-Cancellation is available only from NEW or ACCEPTED and requires a confirmation in the UI. PREPARING/READY cannot be cancelled in this MVP. Completed statuses are terminal. The server validates the transition regardless of buttons. The atomic MongoDB update matches order ID, authenticated restaurant and `expectedStatus`; competing requests cannot both win. A stale update receives 409 and reloads the current queue. Missing/foreign orders receive the same 404. Accepted/preparing/ready/served/cancelled timestamps are written with their transition, alongside existing createdAt/updatedAt fields.
+Staff use only Start preparing and Mark ready. Cancellation is a secondary, confirmed action for NEW or legacy ACCEPTED; PREPARING/READY cannot be cancelled. READY is terminal and remains in recent history, analytics and the final bill. It does not close the visit. ACCEPTED and SERVED remain in the enum for historical compatibility without a migration; unfinished ACCEPTED displays as preparing and can be marked ready. The server validates transitions regardless of buttons. The atomic MongoDB update matches order ID, authenticated restaurant and `expectedStatus`; competing requests cannot both win. Stale updates return 409 and reload the queue. Missing/foreign orders receive the same 404. New transitions write preparingAt/readyAt/cancelledAt; historical timestamps remain untouched.
 
 `order.created` is published only after the Phase 3 transaction commits, outside the retried callback. Idempotent retries return the stored order without another created event. `order.status.updated` publishes only after a successful conditional update. Both notify only the relevant restaurant and visit channels. Publishing is awaited with a three-second SDK timeout and errors are caught: a provider failure never rolls back a valid order/status update or changes a successful response into an error. Logs omit credentials and provider URLs.
 
@@ -524,7 +526,7 @@ Status is derived, not stored: inactive flag -> INACTIVE; active visit -> OCCUPI
 
 ### Safe lifecycle and concurrency
 
-An ACTIVE visit blocks deactivation. Close Session requires the exact current session ID and fails while any NEW/ACCEPTED/PREPARING/READY order or PENDING/ACKNOWLEDGED service call remains. The transaction sets CLOSED/closedAt only when those checks pass, preserving every historical record. Duplicate closes return 409; a stale session ID cannot close a newer visit.
+An ACTIVE visit blocks deactivation. Close Session requires the exact current session ID and fails while any NEW/PREPARING order (or legacy ACCEPTED order) or PENDING/ACKNOWLEDGED service call remains. The transaction sets CLOSED/closedAt only when those checks pass, preserving every historical record. Duplicate closes return 409; a stale session ID cannot close a newer visit.
 
 An additive, internal `Table.lifecycleVersion` field provides a shared write lock between visit creation, deactivation and closure. Existing tables need no backfill: `$inc` creates the field when first used. Closing also writes the same TableSession that order/service creation writes. MongoDB transaction conflict retries therefore serialize these operations; no read-check-write gap can strand an active visit on an inactive table or close a visit around a newly committed request. Replica-set MongoDB is required. No new indexes are needed; keep running `npm run db:indexes` during deployment for the existing unique/partial constraints.
 
@@ -602,17 +604,17 @@ All reports select each collection by its own **createdAt** in the reporting per
 | Metric | Definition |
 | --- | --- |
 | Orders, day/hour order counts | Non-cancelled orders: NEW, ACCEPTED, PREPARING, READY and SERVED. |
-| Completed Order Value | Sum of stored Order.subtotal for SERVED orders only. CANCELLED and active orders contribute zero. |
-| Average Completed Order | Completed Order Value divided by SERVED order count, rounded once to the nearest integer agora. No served orders -> Not enough data. |
+| Completed Order Value | Sum of stored Order.subtotal for READY and legacy SERVED orders. CANCELLED and active orders contribute zero. |
+| Average Completed Order | Completed Order Value divided by READY plus legacy SERVED order count, rounded once to the nearest integer agora. No completed orders -> Not enough data. |
 | Completed / Cancelled | Separate current-status counts inside the selected creation-date cohort. |
 | Tables with Orders | Distinct table IDs with non-cancelled orders in the period; not an occupancy estimate. |
-| Top Products | Top 10 by sum of item quantities in SERVED orders, then itemTotal value, then product ID for ties. Stored itemTotal supplies value. Latest snapshot names within the period supply AR/HE/EN labels. No Product/Category lookup is used; archived/deleted products remain historical. |
+| Top Products | Top 10 by sum of item quantities in READY and legacy SERVED orders, then itemTotal value, then product ID for ties. Stored itemTotal supplies value. Latest snapshot names within the period supply AR/HE/EN labels. No Product/Category lookup is used; archived/deleted products remain historical. |
 | Table Activity | Up to 50 tables ranked by non-cancelled orders, then visits. Displays independent visit/order cohorts and served value. Table numbers use one tenant-scoped batch lookup; missing tables display a historical-table label. |
 | Visits | TableSessions created in the period, split by current ACTIVE/CLOSED state. |
 | Average Closed Visit Duration | createdAt -> closedAt, only valid CLOSED visits. |
-| Acceptance time | Order.createdAt -> acceptedAt, excluding cancelled orders. |
+| Start time | Order.createdAt -> preparingAt (legacy acceptedAt when present), excluding cancelled orders. |
 | Preparation time | preparingAt -> readyAt, excluding cancelled orders. |
-| Fulfillment time | createdAt -> servedAt, SERVED orders only. |
+| Fulfillment time | createdAt -> readyAt for READY; createdAt -> servedAt for legacy SERVED. Each completed order counts once. |
 | Service calls | All requests created in the period, split WAITER/BILL/HELP, including unresolved requests. |
 | Service response / resolution | createdAt -> acknowledgedAt / resolvedAt. |
 
@@ -659,10 +661,10 @@ Modified:
 ### Manual verification
 
 1. Run `npm run db:indexes` against the intended development database, start DSMenu and log in. Open Analytics.
-2. Submit a customer order. Today counts it, while Completed Order Value stays unchanged until staff marks it SERVED. Cancel a separate order and check the separate cancellation count.
+2. Submit a customer order. Today counts it, while Completed Order Value stays unchanged until staff marks it READY. Cancel a separate order and check the separate cancellation count.
 3. Change a product's live price or archive it; existing served-order values and top-product history must retain their snapshot values.
 4. Compare Today, Yesterday, 7 Days and 30 Days. Check the displayed Jerusalem timezone. Near midnight, compare the local date rather than UTC date.
-5. Move an order through acceptance/preparation/ready/served, handle a service call, and close a safe visit. Check timing samples and visit/service counts after reloading. Resolving a bill request must never produce a payment confirmation.
+5. Move an order through preparation/ready, handle a service call, and close a safe visit. Check timing samples and visit/service counts after reloading. Resolving a bill request must never produce a payment confirmation.
 6. Log in as another restaurant. Its report must contain only its own records; adding restaurantId to the analytics API query must fail.
 7. Switch AR/HE/EN and check tablet/mobile layouts. Empty periods should show zero counts and Not enough data for averages.
 

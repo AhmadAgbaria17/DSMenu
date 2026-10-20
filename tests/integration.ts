@@ -167,6 +167,9 @@ async function main() {
     const { runBillHttpChecks } = await import('./table-bill-http');
     await runBillHttpChecks(base, staffFixture);
     if (process.argv.includes('--browser')) { const { runBillBrowserChecks } = await import('./table-bill-browser'); await runBillBrowserChecks(base, staffFixture); }
+    const { runPreparationHttpChecks } = await import('./preparation-http');
+    await runPreparationHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runPreparationBrowserChecks } = await import('./preparation-browser'); await runPreparationBrowserChecks(base, staffFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

@@ -28,7 +28,7 @@ Live Orders groups by the appropriate visit. Takeaway cards prominently identify
 
 The existing Pusher provider publishes only `{version:1}` invalidations after successful commits to the restaurant channel and a private takeaway-session channel. Customer authorization derives that exact channel from the cookie credential; staff still authenticate their restaurant channel. No names, phones or tokens enter events. Existing sound deduplication, reconnect, polling and manual-refresh behavior is reused.
 
-Statuses stay NEW -> ACCEPTED -> PREPARING -> READY -> SERVED, with existing cancellation rules. READY reads "Your order is ready for pickup" to takeaway customers; SERVED reads "Picked up", with a corresponding staff button. Pickup does not close the 12-hour visit. There is no delivery tracking or online payment.
+Statuses now follow NEW -> PREPARING -> READY. NEW can be cancelled. READY reads "Your order is ready for pickup" and leaves the active queue. Legacy SERVED remains readable as "Picked up" without a staff pickup button. READY does not close the 12-hour visit. There is no delivery tracking or online payment.
 
 Takeaway orders contribute to existing order totals, completed value, products and timing analytics. Table-specific aggregates explicitly exclude records without table IDs; takeaway does not invent a table or inflate table counts. No analytics redesign was added.
 
@@ -43,7 +43,7 @@ The grid is one column below 600px, two from 600px and three from 1280px. It inh
 1. Apply indexes, log in as Salt staff, open QR Codes, and copy/print the separate Takeaway QR.
 2. Open `/r/salt?mode=takeaway` in a separate customer browser. Enter Ahmad and 0501234567. Confirm the menu appears, refresh retains the visit, and service buttons are absent.
 3. Configure a burger with free ingredients and paid Cheese through Products if needed. Remove Tomato, add Cheese, select sauce, and submit. Staff should immediately see Take Away, Ahmad, phone, item selections and the authoritative total.
-4. Accept, prepare, mark ready and mark picked up. Customer status should update without refresh. The served order leaves the urgent queue and remains in history. Repeat with two visitors sharing the same name.
+4. Start preparing, then mark ready. Customer status should update without refresh. The ready order leaves the urgent queue and remains in history. Repeat with two visitors sharing the same name.
 5. Check `/r/salt?table=7` still detects Table 7 and keeps a separate cart/session.
 6. Open Products. Verify category grouping, category-local order, search and side-by-side cards. Toggle Cola unavailable and check the public menu. Edit a burger and verify options and image upload remain available.
 7. Repeat in AR/HE/EN and at mobile/tablet/desktop widths.

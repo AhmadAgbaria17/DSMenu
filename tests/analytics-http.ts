@@ -48,21 +48,21 @@ export async function runAnalyticsHttpChecks(base: string, staffFixture: StaffFi
   assert.equal((await staff.request('/api/dashboard/analytics?range=all')).status, 400);
   assert.equal((await staff.request('/api/dashboard/analytics?range=today&range=yesterday')).status, 400);
   const data = await get('yesterday');
-  assert.deepEqual(data.summary, { orders: 4, completedOrders: 3, cancelledOrders: 1, completedValue: 12140, averageOrderValue: 4047, orderedTables: 1 });
-  assert.equal(data.products[0].nameEn, 'Historical Burger'); assert.equal(data.products[0].quantity, 2); assert.equal(data.products[0].completedValue, 9600);
+  assert.deepEqual(data.summary, { orders: 4, completedOrders: 4, cancelledOrders: 1, completedValue: 16940, averageOrderValue: 4235, orderedTables: 1 });
+  assert.equal(data.products[0].nameEn, 'Historical Burger'); assert.equal(data.products[0].quantity, 3); assert.equal(data.products[0].completedValue, 14400);
   assert.equal(data.products.find(p => p.id === String(deletedProduct._id))?.completedValue, 2540);
-  assert.deepEqual(data.days, [{ date: yesterday.days[0], orders: 4, completedValue: 12140 }]); assert.equal(data.hours[0].orders, 4); assert.equal(data.hours.reduce((n, h) => n + h.orders, 0), 4);
-  assert.deepEqual(data.timing.accept, { milliseconds: 180000, samples: 2 }); assert.deepEqual(data.timing.prepare, { milliseconds: 900000, samples: 2 }); assert.deepEqual(data.timing.fulfill, { milliseconds: 1800000, samples: 2 });
+  assert.deepEqual(data.days, [{ date: yesterday.days[0], orders: 4, completedValue: 16940 }]); assert.equal(data.hours[0].orders, 4); assert.equal(data.hours.reduce((n, h) => n + h.orders, 0), 4);
+  assert.deepEqual(data.timing.accept, { milliseconds: 180000, samples: 2 }); assert.deepEqual(data.timing.prepare, { milliseconds: 900000, samples: 2 }); assert.deepEqual(data.timing.fulfill, { milliseconds: 1300000, samples: 3 });
   assert.deepEqual(data.visits, { total: 3, active: 1, closed: 2, duration: { milliseconds: 3600000, samples: 1 } });
   assert.deepEqual(data.services, { total: 3, waiter: 1, bill: 1, help: 1, acknowledge: { milliseconds: 120000, samples: 2 }, resolution: { milliseconds: 240000, samples: 2 } });
   assert.equal(data.tables.find(t => t.number === 1)?.orders, 4); assert.equal(data.tables.find(t => t.number === 2)?.visits, 1);
   assert.doesNotMatch(JSON.stringify(data), /PRIVATE|password|credentials|token|email|phone|Current Expensive Burger|TenantSecret/);
   const today = await get('today'); assert.equal(today.summary.orders, 0); assert.equal(today.summary.averageOrderValue, null); assert.equal(today.timing.prepare.milliseconds, null);
-  const seven = await get('7days'); assert.equal(seven.days.length, 7); assert.equal(seven.summary.orders, 5); assert.equal(seven.summary.completedValue, 13140); assert.equal(seven.visits.total, 4); assert.equal(seven.summary.orderedTables, 2);
+  const seven = await get('7days'); assert.equal(seven.days.length, 7); assert.equal(seven.summary.orders, 5); assert.equal(seven.summary.completedValue, 17940); assert.equal(seven.visits.total, 4); assert.equal(seven.summary.orderedTables, 2);
   assert.equal((await get('30days')).days.length, 30);
   const before = await makeOrder('SERVED', 100, 1, product._id, new Date(yesterday.start.getTime() - 1));
   const atEnd = await makeOrder('SERVED', 200, 1, product._id, yesterday.end);
-  assert.equal((await get('yesterday')).summary.completedValue, 12140, 'neither instant outside the half-open range leaks into yesterday');
+  assert.equal((await get('yesterday')).summary.completedValue, 16940, 'neither instant outside the half-open range leaks into yesterday');
   assert.equal((await get('today')).summary.completedValue, 200, 'local midnight belongs to today');
   assert.equal((await get('today')).summary.orders, 1);
   await Order.deleteMany({ _id: { $in: [before._id, atEnd._id] }, restaurantId: restaurant._id });
@@ -73,6 +73,6 @@ export async function runAnalyticsHttpChecks(base: string, staffFixture: StaffFi
     await model.createIndexes(); // additive, rerunnable; unique session/order indexes remain.
   }
   assert.ok((await Order.collection.indexes()).some(index => index.unique && index.key.idempotencyKey === 1));
-  console.log('PASS: analytics private scope, presets, Jerusalem midnight/hour grouping, served snapshot value, cancellations, rounding, deleted products, valid timings, visits, service breakdown, privacy and additive indexes.');
+  console.log('PASS: analytics private scope, presets, Jerusalem midnight/hour grouping, ready and legacy served snapshot value, cancellations, rounding, deleted products, valid timings, visits, service breakdown, privacy and additive indexes.');
   return { email, password, restaurantId: String(restaurant._id), date: localDateKey(stamp(10)) };
 }

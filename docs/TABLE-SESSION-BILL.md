@@ -14,7 +14,7 @@ No duplicate bill total is stored. Closed visits can be reconstructed through th
 
 `GET /api/dashboard/tables/[id]/bill?sessionId=...` authenticates staff and scopes all reads to their restaurant, table and session. Its DTO is serialized and private/no-store. A MongoDB snapshot transaction gives a consistent view of orders and service calls. It includes no session credentials.
 
-The existing close transaction still writes the table lifecycle and ACTIVE session, so concurrent customer order/service creation conflicts and retries safely. Before commit it reconstructs the authoritative bill and refuses closure for NEW/ACCEPTED/PREPARING/READY orders or PENDING/ACKNOWLEDGED calls. Rejection rolls back the temporary CLOSED write. Success sets CLOSED and closedAt and preserves all history. The existing table status becomes AVAILABLE; old customer credentials cannot create orders or calls.
+The existing close transaction still writes the table lifecycle and ACTIVE session, so concurrent customer order/service creation conflicts and retries safely. Before commit it reconstructs the authoritative bill and refuses closure for NEW/PREPARING orders (including unfinished legacy ACCEPTED orders) or PENDING/ACKNOWLEDGED calls. Rejection rolls back the temporary CLOSED write. Success sets CLOSED and closedAt and preserves all history. The existing table status becomes AVAILABLE; old customer credentials cannot create orders or calls.
 
 The drawer submits sessionId and a server-generated SHA-256 bill revision, never a total. The revision covers the exact order snapshots and unresolved-call count. If it changed since review, confirmation returns a conflict, the drawer reloads, and staff must review again. `billRevision` remains optional for backward-compatible existing close callers; every caller still receives the server-side total calculation and all closure safety checks. Unrecognized payload fields such as finalTotal are rejected.
 
@@ -34,7 +34,7 @@ Modified: `src/lib/services/tables.ts`, `src/lib/validators/tables.ts`, `src/com
 
 1. Log in as Salt staff and open Table 7 in a separate customer browser.
 2. Send two burgers and fries. Open Tables → Close Session: the running bill appears, but closing is disabled.
-3. Process that order through SERVED. Send coffee as a second order and serve it.
+3. Process that order through PREPARING to READY. Send coffee as a second order and mark it ready. READY orders remain billed and allow closure.
 4. Open Close Session again. Verify both orders, options, notes, subtotals and total. With burgers at ₪48, fries at ₪18 and coffee at ₪12, the total is ₪126.
 5. Change the current product price: the historical bill must remain unchanged. Cancelled orders, if any, must be labelled and excluded.
 6. Confirm closure after the restaurant has finished handling the table. Verify Available state, preserved order history and rejection of an order using the old credential.

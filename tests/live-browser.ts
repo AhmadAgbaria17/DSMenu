@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { mockRealtime, realtimeTest } from './realtime-transport';
 import type { StaffFixture } from './staff-http';
-import { Order, Table } from '../src/models';
+import { Order, Table, TableSession } from '../src/models';
 import { restaurantChannel } from '../src/lib/realtime-channels';
 
 export async function runLiveBrowserChecks(base: string, fixture: StaffFixture) {
@@ -60,16 +60,32 @@ export async function runLiveBrowserChecks(base: string, fixture: StaffFixture) 
     await reconciled;
     await expect(dashboard.getByText('Live updates connected', { exact: true })).toBeVisible();
     await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '1');
+    await expect(card.getByRole('button', { name: 'Accept', exact: true })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Mark served', exact: true })).toHaveCount(0);
     await card.scrollIntoViewIfNeeded();
     await dashboard.screenshot({ path: 'test-artifacts/live-orders-en-tablet.png' });
-    for (const [action, status] of [['Accept', 'Accepted'], ['Start preparing', 'Preparing'], ['Mark ready', 'Ready'], ['Mark served', 'Served']]) {
+    for (const [action, status] of [['Start preparing', 'Preparing'], ['Mark ready', 'Ready']]) {
       await card.getByRole('button', { name: action, exact: true }).click();
       await expect(menu.getByTestId('submitted-order').filter({ hasText: 'Live test: no onion' })).toContainText(status);
     }
     await expect(card).toHaveCount(0);
+    assert.equal((await TableSession.findById(order.tableSessionId).orFail()).status, 'ACTIVE');
     await dashboard.getByRole('button', { name: 'Recent history', exact: true }).click();
-    await expect(card).toBeVisible(); await expect(card).toContainText('Served');
-    assert.equal((await Order.findById(order._id).orFail()).status, 'SERVED');
+    await expect(card).toBeVisible(); await expect(card).toContainText('Ready');
+    assert.equal((await Order.findById(order._id).orFail()).status, 'READY');
+    await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '1');
+    // Simulate records written by the old application without migrating history.
+    await Order.updateOne({ _id: order._id }, { $set: { status: 'ACCEPTED' }, $unset: { preparationBatchId: 1 } });
+    await dashboard.getByRole('button', { name: 'Refresh orders', exact: true }).click();
+    await dashboard.getByRole('button', { name: 'All active', exact: true }).click();
+    await expect(card).toContainText('Preparing');
+    await card.getByRole('button', { name: 'Mark ready', exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await Order.updateOne({ _id: order._id }, { $set: { status: 'SERVED', servedAt: new Date() } });
+    await dashboard.getByRole('button', { name: 'Refresh orders', exact: true }).click();
+    await dashboard.getByRole('button', { name: 'Recent history', exact: true }).click();
+    await expect(card).toContainText('Served');
+    await expect(card.getByRole('button')).toHaveCount(0);
     await expect(dashboard.locator('html')).toHaveAttribute('data-test-sounds', '1');
     await dashboard.getByRole('button', { name: 'Sound notifications', exact: true }).click();
     await menu.keyboard.press('Escape');

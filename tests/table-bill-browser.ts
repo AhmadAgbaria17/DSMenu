@@ -47,7 +47,7 @@ export async function runBillBrowserChecks(base: string, fixture: StaffFixture) 
     async function serve(id: string) {
       await page.goto(base + '/dashboard/orders');
       const card = page.getByTestId('staff-order-' + id);
-      for (const action of ['Accept', 'Start preparing', 'Mark ready', 'Mark served']) await card.getByRole('button', { name: action, exact: true }).click();
+      for (const action of ['Start preparing', 'Mark ready']) await card.getByRole('button', { name: action, exact: true }).click();
       await expect(card).toHaveCount(0);
     }
     await serve(String(first._id));
@@ -69,6 +69,6 @@ export async function runBillBrowserChecks(base: string, fixture: StaffFixture) 
     await staff.addCookies([{ name: 'dsmenu-language', value: 'en', url: base }]); await page.reload(); await row.getByRole('button', { name: 'Close Session', exact: true }).click(); await expect(page.getByTestId('bill-close')).toBeEnabled(); await page.getByTestId('bill-close').click(); await expect(row).toContainText('Available'); await expect(page.getByText('Session closed successfully.', { exact: true })).toBeVisible();
     const closed = await TableSession.findById(visit._id).orFail(); assert.equal(closed.status, 'CLOSED'); assert.ok(closed.closedAt); assert.equal(await Order.countDocuments({ tableSessionId: visit._id }), 2);
     assert.equal((await customer.request.post(base + '/api/r/salt/tables/7/orders', { headers: { Origin: base }, data: { clientRequestId: randomUUID(), items: [{ productId: String(coffee._id), quantity: 1, note: '' }] } })).status(), 409);
-    assert.deepEqual(errors, []); console.log('PASS: Table 7 browser two burgers/fries then coffee, blocked running bill, staff served transitions, 126.00 final snapshot bill/options/notes, AR/HE RTL, reviewed close, availability and old credential rejection.');
+    assert.deepEqual(errors, []); console.log('PASS: Table 7 browser two burgers/fries then coffee, blocked running bill, two-action ready transitions, 126.00 final snapshot bill/options/notes, AR/HE RTL, reviewed close, availability and old credential rejection.');
   } finally { await Product.updateOne({ _id: burger._id }, { $set: saved }); await browser.close(); }
 }

@@ -2,10 +2,14 @@ import { z } from 'zod';
 import { orderStatuses } from '@/types/domain';
 import type { OrderStatus } from '@/types/orders';
 
-export const activeOrderStatuses = ['NEW', 'ACCEPTED', 'PREPARING', 'READY'] as const;
+export const activeOrderStatuses = ['NEW', 'PREPARING'] as const;
+// Legacy ACCEPTED remains unfinished preparation.
+export const unfinishedOrderStatuses = [...activeOrderStatuses, 'ACCEPTED'] as const;
+export const completedOrderStatuses = ['READY', 'SERVED'] as const;
+export function operationalStatus(status: OrderStatus): OrderStatus { return status === 'ACCEPTED' ? 'PREPARING' : status; }
 export const transitions: Record<OrderStatus, readonly OrderStatus[]> = {
-  NEW: ['ACCEPTED', 'CANCELLED'], ACCEPTED: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['READY'], READY: ['SERVED'], SERVED: [], CANCELLED: [],
+  NEW: ['PREPARING', 'CANCELLED'], ACCEPTED: ['READY', 'CANCELLED'],
+  PREPARING: ['READY'], READY: [], SERVED: [], CANCELLED: [],
 };
 export const statusChangeSchema = z.object({ expectedStatus: z.enum(orderStatuses), status: z.enum(orderStatuses) });
 export function canTransition(from: OrderStatus, to: OrderStatus) { return transitions[from].includes(to); }

@@ -64,7 +64,7 @@ export async function runTakeawayHttpChecks(base: string, fixture: StaffFixture)
     const other = new AuthClient(base); await createStaffUser({ restaurant: 'other', name: 'Foreign takeaway', email: 'takeaway@other.local', password: fixture.password, role: 'OWNER' }); await other.login('takeaway@other.local', fixture.password); assert.ok(!(await (await other.request('/api/dashboard/orders')).text()).includes(order.id));
     const analyticsBefore = await (await staff.request('/api/dashboard/analytics?range=today')).json() as AnalyticsDto;
     let expectedStatus = 'NEW';
-    for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'SERVED']) {
+    for (const status of ['PREPARING', 'READY']) {
       const response = await staff.request(`/api/dashboard/orders/${order.id}`, { method: 'PATCH', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedStatus, status }) }); assert.equal(response.status, 200); expectedStatus = status;
       assert.equal((await (await request(`${path}/orders`, undefined, cookie)).json()).orders[0].status, status);
     }

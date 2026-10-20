@@ -4,7 +4,7 @@ import { Table, TableSession, Order, ServiceCall, Restaurant } from '@/models';
 import { requireStaffApi, StaffApiError } from '@/lib/staff-http';
 import { createTableInput, editTableInput, closeTableInput, tableState } from '@/lib/validators/tables';
 import { objectIdSchema } from '@/lib/validators/common';
-import { activeOrderStatuses } from '@/lib/order-flow';
+import { unfinishedOrderStatuses } from '@/lib/order-flow';
 import { isDuplicateKey } from '@/lib/customer-errors';
 import { appOrigin } from '@/lib/env';
 import { tableQrUrl } from '@/lib/qr';
@@ -18,7 +18,7 @@ export async function getManagedTables(): Promise<TableSnapshot> {
     Restaurant.findById(staff.restaurantId).select('name slug logo').lean().orFail(),
     Table.find(scope).sort({ tableNumber: 1 }).lean(),
     TableSession.find({ ...scope, status: 'ACTIVE' }).select('_id tableId createdAt').lean(),
-    Order.find({ ...scope, status: { $in: activeOrderStatuses } }).select('tableSessionId').lean(),
+    Order.find({ ...scope, status: { $in: unfinishedOrderStatuses } }).select('tableSessionId').lean(),
     ServiceCall.find({ ...scope, status: { $in: ['PENDING', 'ACKNOWLEDGED'] } }).select('tableSessionId').lean(),
   ]);
   const count = (rows: { tableSessionId?: mongoose.Types.ObjectId | null }[]) => {

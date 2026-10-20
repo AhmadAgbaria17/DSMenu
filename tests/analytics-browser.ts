@@ -12,10 +12,10 @@ export async function runAnalyticsBrowserChecks(base: string, fixture: Analytics
     await expect(page.getByTestId('today-orders')).toHaveText('0'); await page.getByRole('link', { name: 'Analytics', exact: true }).click();
     await expect(page.getByTestId('analytics-orders')).toHaveText('0'); await expect(page.getByTestId('analytics-averageOrderValue')).toHaveText('Not enough data');
     await page.getByRole('link', { name: 'Yesterday', exact: true }).click();
-    await expect(page.getByTestId('analytics-orders')).toHaveText('4'); await expect(page.getByTestId('analytics-completedValue')).toContainText('121.40'); await expect(page.getByTestId('analytics-averageOrderValue')).toContainText('40.47');
-    await expect(page.getByTestId('analytics-product').first()).toContainText('Historical Burger'); await expect(page.getByTestId('analytics-product').first()).toContainText('2 units');
+    await expect(page.getByTestId('analytics-orders')).toHaveText('4'); await expect(page.getByTestId('analytics-completedValue')).toContainText('169.40'); await expect(page.getByTestId('analytics-averageOrderValue')).toContainText('42.35');
+    await expect(page.getByTestId('analytics-product').first()).toContainText('Historical Burger'); await expect(page.getByTestId('analytics-product').first()).toContainText('3 units');
     await expect(page.getByTestId('analytics-prepareTime')).toHaveText('15 min'); await expect(page.getByTestId('analytics-serviceCalls')).toHaveText('3');
-    await expect(page.getByTestId(`analytics-day-${fixture.date}`)).toContainText('121.40'); await expect(page.getByTestId('analytics-hour-0')).toContainText('4');
+    await expect(page.getByTestId(`analytics-day-${fixture.date}`)).toContainText('169.40'); await expect(page.getByTestId('analytics-hour-0')).toContainText('4');
     assert.equal(await page.getByText('Current Expensive Burger', { exact: true }).count(), 0); assert.equal(await page.getByText('Classic Burger', { exact: true }).count(), 0);
     await page.getByRole('link', { name: 'Last 7 Days', exact: true }).click(); await expect(page.getByTestId('analytics-orders')).toHaveText('5'); await expect(page.locator('[data-testid^="analytics-day-"]')).toHaveCount(7);
     await page.getByRole('link', { name: 'Last 30 Days', exact: true }).click(); await expect(page.locator('[data-testid^="analytics-day-"]')).toHaveCount(30);

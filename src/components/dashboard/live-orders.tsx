@@ -2,15 +2,16 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { activeOrderStatuses, unseenNewOrders } from '@/lib/order-flow';
+import { activeOrderStatuses, operationalStatus, unseenNewOrders } from '@/lib/order-flow';
 import { useActivity } from './activity-provider';
-import { StaffOrderCard } from './order-card';
+import { PreparationCard } from './preparation-card';
+import { preparationGroups, type PreparationGroup } from '@/lib/preparation-groups';
 import type { LiveOrder, LiveOrdersSnapshot } from '@/types/live-orders';
 import type { OrderStatus } from '@/types/orders';
 
-const filters = ['active', 'NEW', 'ACCEPTED', 'PREPARING', 'READY', 'history'] as const;
+const filters = ['active', 'NEW', 'PREPARING', 'history'] as const;
 
-export function LiveOrders({ initial }: { initial: LiveOrdersSnapshot; restaurantId: string }) {
+export function LiveOrders({ initial, restaurantId }: { initial: LiveOrdersSnapshot; restaurantId: string }) {
   const t = useTranslations('LiveOrders');
   const menu = useTranslations('Menu');
   const takeaway = useTranslations('Takeaway');
@@ -45,13 +46,13 @@ export function LiveOrders({ initial }: { initial: LiveOrdersSnapshot; restauran
   const reconcile = useEffectEvent((silent: boolean) => { void refresh(silent); });
   useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled && pulse.number) reconcile(pulse.silent); }); return () => { cancelled = true; }; }, [pulse.number, pulse.silent]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
-  async function update(order: LiveOrder, status: OrderStatus) {
+  async function mutate(id: string, url: string, payload: unknown) {
     if (mutating.current) return;
-    mutating.current = true; sequence.current++; setPending(order.id); setError(null);
+    mutating.current = true; sequence.current++; setPending(id); setError(null);
     let conflict = false;
     let failed = false;
     try {
-      const response = await fetch(`/api/dashboard/orders/${order.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedStatus: order.status, status }), signal: AbortSignal.timeout(15_000) });
+      const response = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15_000) });
       if (response.status === 401) { router.replace('/login'); router.refresh(); }
       conflict = response.status === 409;
       failed = !response.ok && !conflict;
@@ -60,8 +61,14 @@ export function LiveOrders({ initial }: { initial: LiveOrdersSnapshot; restauran
     await refresh(true);
     if (conflict) setError('conflict'); else if (failed) setError('failed');
   }
-  const active = (order: LiveOrder) => (activeOrderStatuses as readonly string[]).includes(order.status);
-  const visible = snapshot.orders.filter(order => filter === 'active' ? active(order) : filter === 'history' ? !active(order) : order.status === filter);
+  function update(order: LiveOrder, status: OrderStatus) {
+    return mutate(order.id, `/api/dashboard/orders/${order.id}`, { expectedStatus: order.status, status });
+  }
+  function prepare(group: PreparationGroup, status: 'PREPARING' | 'READY') {
+    return mutate(group.key, '/api/dashboard/orders/preparation', { orderIds: group.orders.map(order => order.id), expectedStatus: group.orders[0].status, status });
+  }
+  const active = (order: LiveOrder) => (activeOrderStatuses as readonly string[]).includes(operationalStatus(order.status));
+  const visible = snapshot.orders.filter(order => filter === 'active' ? active(order) : filter === 'history' ? !active(order) : operationalStatus(order.status) === filter);
   const groups = new Map<string, LiveOrder[]>();
   for (const order of visible) { const id = order.takeawaySessionId ?? order.tableSessionId ?? order.id; groups.set(id, [...(groups.get(id) ?? []), order]); }
   return <>
@@ -70,6 +77,6 @@ export function LiveOrders({ initial }: { initial: LiveOrdersSnapshot; restauran
     {error && <p role="alert" className="mb-6 rounded-xl bg-amber-50 p-4 text-amber-950">{t(error)}</p>}
     {filter === 'history' && <p className="mb-5 text-sm text-stone-500">{t('historyHint')}</p>}
     {!visible.length && <p className="rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-lg">{t('empty')}</p>}
-    <div className="space-y-8">{[...groups].map(([visit, orders]) => <section key={visit} data-testid={`order-group-${visit}`}><h2 className="mb-4 text-2xl font-bold">{orders[0].fulfillmentType === 'TAKEAWAY' ? takeaway('title') : orders[0].tableNumber === null ? t('unknownTable') : menu('table', { number: orders[0].tableNumber })}<span className="ms-3 text-sm font-normal text-stone-500">{t('visit', { id: visit.slice(-6) })}</span></h2><div className="grid gap-4 xl:grid-cols-2">{orders.map(order => <StaffOrderCard key={order.id} order={order} now={now} pending={pending !== null} update={(item, next) => void update(item, next)} />)}</div></section>)}</div>
+    <div className="space-y-8">{[...groups].map(([visit, orders]) => <section key={visit} data-testid={`order-group-${visit}`}><h2 className="mb-4 text-2xl font-bold">{orders[0].fulfillmentType === 'TAKEAWAY' ? takeaway('title') : orders[0].tableNumber === null ? t('unknownTable') : menu('table', { number: orders[0].tableNumber })}<span className="ms-3 text-sm font-normal text-stone-500">{t('visit', { id: visit.slice(-6) })}</span></h2><div className="grid gap-4 xl:grid-cols-2">{preparationGroups(orders, restaurantId).map(group => <PreparationCard key={group.key} group={group} now={now} pending={pending !== null} update={(item, next) => void update(item, next)} prepare={(items, next) => void prepare(items, next)} />)}</div></section>)}</div>
   </>;
 }

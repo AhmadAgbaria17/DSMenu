@@ -1,4 +1,4 @@
-import { Schema } from 'mongoose';
+import { Schema, models, deleteModel } from 'mongoose';
 import { orderStatuses } from '@/types/domain';
 import { cachedModel, reference, localizedNames, minorUnits } from './shared';
 import { optionSnapshot } from './product-options';
@@ -25,6 +25,8 @@ const schema = new Schema({
   idempotencyKey: { type: String, required: true, maxlength: 100 },
   requestFingerprint: { type: String, match: /^[a-f\d]{64}$/, select: false },
   status: { type: String, enum: orderStatuses, default: 'NEW' },
+  // Operational membership only; snapshots, totals and order identity stay individual.
+  preparationBatchId: { type: Schema.Types.ObjectId },
   acceptedAt: Date, preparingAt: Date, readyAt: Date, servedAt: Date, cancelledAt: Date,
   items: { type: [itemSchema], required: true, validate: (v: unknown[]) => v.length > 0 && v.length <= 100 },
   subtotal: minorUnits,
@@ -41,4 +43,7 @@ schema.pre('validate', function () {
   if (this.fulfillmentType === 'TAKEAWAY' && (this.tableId || this.tableSessionId)) this.invalidate('tableId', 'Takeaway cannot reference a table.');
   if (this.fulfillmentType !== 'TAKEAWAY' && (this.takeawaySessionId || this.customerName || this.customerPhone)) this.invalidate('takeawaySessionId', 'Table orders cannot reference takeaway identity.');
 });
+// Next.js hot reload can retain the model compiled before batch identity existed.
+// Strict Mongoose updates would otherwise discard the new field but save status.
+if (models.Order && !models.Order.schema.path('preparationBatchId')) deleteModel('Order');
 export const Order = cachedModel('Order', schema);
