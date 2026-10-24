@@ -1,0 +1,29 @@
+/* Roll width is selected in the printer driver. CSS does not support an
+   interoperable `size: 80mm auto`; auto preserves the selected printer paper. */
+@page dsmenu-kitchen { size: auto; margin: 3mm; }
+.kitchen-print-page { --ticket-width: 74mm; padding: 1.5rem; }
+.kitchen-print-page[data-paper-width="58"] { --ticket-width: 52mm; }
+.kitchen-print-controls { max-width: 45rem; margin: 0 auto 1.5rem; }
+.kitchen-ticket { box-sizing: border-box; width: var(--ticket-width); max-width: 100%; margin: 0 auto; padding: 0; color: #000; background: #fff; font-family: Arial, Tahoma, sans-serif; font-size: 12pt; line-height: 1.4; overflow-wrap: anywhere; }
+.ticket-heading { text-align: center; padding-bottom: 3mm; border-bottom: 2px solid #000; }
+.ticket-heading h1 { font-size: 17pt; font-weight: 800; }
+.ticket-heading h2 { font-size: 23pt; font-weight: 900; margin: 2mm 0; }
+.ticket-heading p { margin-top: 1mm; }
+.ticket-customer { font-size: 15pt; font-weight: 700; }
+.ticket-order > h3 { font-weight: 800; font-size: 14pt; margin: 3mm 0 1mm; }
+.ticket-item { padding: 3mm 0; border-bottom: 1px dashed #000; break-inside: avoid; page-break-inside: avoid; }
+.ticket-item h4 { font-size: 15pt; font-weight: 800; }
+.ticket-options { margin-top: 2mm; padding-inline-start: 2mm; }
+.ticket-options h5, .ticket-removed strong { font-weight: 800; font-size: 12pt; }
+.ticket-options ul { list-style: disc; padding-inline-start: 5mm; margin: 0; }
+.ticket-removed { margin-top: 1mm; }
+.ticket-note { border: 2px solid #000; padding: 2mm; margin-top: 2mm; font-size: 14pt; font-weight: 800; white-space: pre-wrap; }
+.ticket-note strong, .ticket-note span { display: block; }
+.ticket-note strong { border-bottom: 1px solid #000; padding-bottom: 1mm; margin-bottom: 1mm; }
+.ticket-footer { border-top: 2px solid #000; padding-top: 2mm; margin-top: 3mm; text-align: center; font-weight: 700; }
+@media print {
+  html:has(.kitchen-print-page), body:has(.kitchen-print-page) { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; min-height: 0 !important; }
+  .kitchen-print-controls { display: none !important; }
+  .kitchen-print-page { page: dsmenu-kitchen; padding: 0; margin: 0; }
+  .kitchen-ticket { margin: 0; box-shadow: none; }
+}

@@ -703,3 +703,7 @@ Products links to `/dashboard/option-templates`. Save existing product groups as
 ### Table session bills
 
 Tables → Close Session opens a snapshot-based bill before confirmation. Active orders and unresolved service calls block closure; cancelled orders are displayed but excluded from the total. No payment is processed or verified. See [workflow, safety rules and manual checks](docs/TABLE-SESSION-BILL.md).
+
+## Kitchen thermal tickets
+
+PREPARING orders/batches support optional kitchen tickets, shared Printed/Reprint counts, and AR/HE/EN 80mm/58mm layouts. Run `npm run db:indexes` before production use. See [printing workflow and printer setup](docs/KITCHEN-PRINTING.md). Browser print initiation is tracked; physical output is not confirmed.

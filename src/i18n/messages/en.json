@@ -1,4 +1,27 @@
 {
+  "Kitchen": {
+    "title": "Kitchen preparation ticket",
+    "print": "Print Kitchen Ticket",
+    "reprint": "Reprint Kitchen Ticket",
+    "printed": "{count, plural, one {✓ Printed} other {✓ Printed ×#}}",
+    "table": "TABLE",
+    "tableUnknown": "TABLE ORDER",
+    "takeaway": "TAKE AWAY",
+    "preparedAt": "Time:",
+    "orderReferences": "Orders:",
+    "order": "Order",
+    "orderCount": "{count, plural, one {1 order} other {# orders}}",
+    "remove": "REMOVE:",
+    "note": "*** NOTE ***",
+    "paperWidth": "Paper width",
+    "opening": "Opening print dialog…",
+    "back": "Back to Live Orders",
+    "hint": "Choose the paper width, then print. Select your thermal printer and matching paper size in the browser dialog; turn off headers and footers.",
+    "limitation": "Printed means the print flow was initiated. The browser cannot confirm paper output, even if the dialog is cancelled. Reprint when needed.",
+    "failed": "Unable to start printing. Check your connection and try again.",
+    "conflict": "Print state changed on another screen. Review the updated count, then choose Reprint if needed.",
+    "unavailable": "This ticket is no longer available for printing. Return to Live Orders."
+  },
   "Bill": {"final":"Final Bill","current":"Current Bill","notice":"This is an order summary. DSMenu does not process or verify payment.","loading":"Loading bill…","failed":"Unable to load or close this visit. Refresh the bill and try again.","changed":"The visit or bill changed. Review the refreshed bill before closing.","activeOrders":"Complete or cancel active orders before closing this table.","calls":"Resolve all service requests before closing this table.","closed":"Session closed successfully.","refresh":"Refresh bill","opened":"Session opened","empty":"No orders in this visit.","excluded":"Subtotal excluded","unit":"Unit Price","lineTotal":"Line Total","subtotal":"Order subtotal","count":"Included orders: {count}","total":"Session Total","cancelledCount":"Cancelled orders excluded: {count}","confirm":"Confirm that the restaurant has finished handling this table. Closing does not verify payment.","back":"Back"},
   "Templates": {"title":"Saved Option Groups","use":"Use Saved Group","saveAs":"Save as Template","name":"Template Name","create":"Create Template","edit":"Edit Template","duplicate":"Duplicate Template","delete":"Delete Template","deactivate":"Deactivate","activate":"Activate","search":"Search templates","empty":"No saved groups","added":"Template added","already":"Already added","saved":"Template saved","invalid":"Enter a template name and a valid option group.","failed":"Unable to save or load templates. Please try again.","hint":"Templates are independent starting points. Changes affect future copies only.","deleteConfirm":"Delete this template? Groups already copied into products will remain unchanged."},
   "Takeaway": {"title":"Take Away","qr":"Takeaway QR","name":"Name","phone":"Phone number","continue":"Continue to menu","hint":"Enter your name and phone number to place a takeaway order. Pay at the restaurant.","loading":"Please wait…","invalid":"Enter a name (2–100 characters) and a valid phone number (7–15 digits).","failed":"Unable to continue. Please try again.","ready":"Your order is ready for pickup","pickedUp":"Picked up","markPickedUp":"Mark picked up"},
@@ -209,7 +232,8 @@
       "ORDER_LIMIT": "This selection or visit has reached the ordering limit. Please ask a member of staff.",
       "SERVICE_UNAVAILABLE": "Ordering is temporarily unavailable. Your selection is safe; retry this same order in a moment.",
       "NETWORK_ERROR": "We could not confirm the result. Your selection is safe. Retry this same order to check or complete it without duplication.",
-      "VISIT_CHANGED": "A saved submission belongs to an earlier visit. Check with staff before unlocking your selection; it will not be sent to this new visit automatically."
+      "VISIT_CHANGED": "A saved submission belongs to an earlier visit. Check with staff before unlocking your selection; it will not be sent to this new visit automatically.",
+      "NOTES_DISABLED": "Notes are no longer allowed for this product. Remove the note or remove the item before sending."
     }
   },
   "Shopping": {
@@ -227,8 +251,8 @@
     "quantityFor": "Quantity for {name}",
     "increase": "Increase {name} quantity",
     "decrease": "Decrease {name} quantity",
-    "note": "Special requests (optional)",
-    "notePlaceholder": "For example: no onion",
+    "note": "Order notes (optional)",
+    "notePlaceholder": "Enter your notes here…",
     "noteLimit": "{count}/{max} characters",
     "remove": "Remove",
     "removeProduct": "Remove {name}",
@@ -249,7 +273,8 @@
     "limit": "You can add up to 99 of each item and note combination, and 100 different selections.",
     "editNote": "Edit note",
     "saveNote": "Save note",
-    "cancelNote": "Cancel"
+    "cancelNote": "Cancel",
+    "removeNote": "Remove note"
   },
   "Common": {
     "language": "Language",
@@ -386,7 +411,8 @@
       "googleMapsUrl": "Google Maps URL",
       "instagramUrl": "Instagram URL",
       "primaryColor": "Primary color"
-    }
+    },
+    "allowCustomerNote": "Allow customer notes"
   },
   "Tables": {
     "sessionClosed": "Session closed successfully.",

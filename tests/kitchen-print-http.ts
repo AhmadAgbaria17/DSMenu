@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { Types } from 'mongoose';
+import { KitchenPrintState, Order, Product, Restaurant, Table, TableSession } from '../src/models';
+import { AuthClient, type StaffFixture } from './staff-http';
+import { createStaffUser } from '../src/lib/staff-users';
+import type { KitchenTicket } from '../src/types/kitchen-ticket';
+import type { LiveOrdersSnapshot } from '../src/types/live-orders';
+
+export async function runKitchenPrintHttpChecks(base: string, fixture: StaffFixture) {
+  const account = await createStaffUser({ restaurant: 'salt', name: 'Kitchen Staff', email: 'kitchen@salt.local', password: fixture.password, role: 'STAFF' });
+  await createStaffUser({ restaurant: 'other', name: 'Foreign Kitchen', email: 'kitchen@other.local', password: fixture.password, role: 'STAFF' });
+  const staff = new AuthClient(base); await staff.login(account.email, fixture.password);
+  const foreign = new AuthClient(base); await foreign.login('kitchen@other.local', fixture.password);
+  const anonymous = new AuthClient(base);
+  const post = (path: string, body: unknown, actor = staff, origin = base, method = 'POST') => actor.request(path, { method, headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const table = await Table.create({ restaurantId: fixture.restaurantId, tableNumber: 207 });
+  const entry = await fetch(`${base}/api/r/salt/tables/207/session`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(entry.status, 200); const cookie = entry.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const visit = await TableSession.findOne({ tableId: table._id, status: 'ACTIVE' }).orFail();
+  const product = await Product.findOne({ restaurantId: fixture.restaurantId }).orFail();
+  const names = (name: string) => ({ nameAr: name, nameHe: name, nameEn: name });
+  const items = [{ productId: product._id, ...names('Snapshot Burger'), price: 4800, quantity: 2, itemTotal: 9600, notes: 'NO MAYO\nAllergy: sesame', optionGroups: [
+    { id: randomUUID(), ...names('Vegetables'), selected: [], removed: [{ id: randomUUID(), ...names('Tomato'), priceDelta: 0 }, { id: randomUUID(), ...names('Onion'), priceDelta: 0 }] },
+    { id: randomUUID(), ...names('Extras'), selected: [{ id: randomUUID(), ...names('Extra Cheese'), priceDelta: 500 }], removed: [] },
+    { id: randomUUID(), ...names('Sauce'), selected: [{ id: randomUUID(), ...names('Spicy'), priceDelta: 0 }], removed: [] },
+  ] }];
+  const create = (number: number) => Order.create({ restaurantId: fixture.restaurantId, tableId: table._id, tableSessionId: visit._id, orderNumber: number, idempotencyKey: randomUUID(), items, subtotal: 9600, notes: 'Kitchen order note' });
+  const first = await create(1); const second = await create(2);
+  const individualPath = `/api/dashboard/kitchen-print/order/${first._id}`;
+  assert.equal((await staff.request(individualPath)).status, 409, 'NEW cannot print');
+  assert.equal((await post(individualPath, { expectedCount: 0, requestId: randomUUID() })).status, 409);
+  const preparing = await post('/api/dashboard/orders/preparation', { orderIds: [String(first._id), String(second._id)], expectedStatus: 'NEW', status: 'PREPARING' }, staff, base, 'PATCH');
+  assert.equal(preparing.status, 200);
+  const prepared = await Order.findById(first._id).orFail(); const batchId = String(prepared.preparationBatchId);
+  const path = `/api/dashboard/kitchen-print/batch/${batchId}`;
+  const late = await create(3);
+  assert.equal((await staff.request(individualPath)).status, 404, 'cannot print one member of a batch separately');
+  assert.equal((await anonymous.request(path)).status, 401);
+  assert.equal((await post(path, { expectedCount: 0, requestId: randomUUID() }, anonymous)).status, 401);
+  assert.equal((await foreign.request(path)).status, 404);
+  assert.equal((await post(path, { expectedCount: 0, requestId: randomUUID() }, foreign)).status, 404);
+  const protectedPage = await anonymous.request(`/print/kitchen/batch/${batchId}`);
+  assert.ok(protectedPage.status === 307 || /url=\/login/.test(await protectedPage.text()));
+  const foreignPage = await foreign.request(`/print/kitchen/batch/${batchId}`); assert.doesNotMatch(await foreignPage.text(), /Snapshot Burger|NO MAYO/);
+  assert.equal((await staff.request(path + '?restaurantId=' + fixture.restaurantId)).status, 400);
+  assert.equal((await post(path, { expectedCount: 0, requestId: randomUUID(), restaurantId: fixture.restaurantId })).status, 400);
+  assert.equal((await post(path, { expectedCount: 0, requestId: randomUUID() }, staff, 'https://evil.example')).status, 403);
+  const response = await staff.request(path); assert.equal(response.status, 200); assert.match(response.headers.get('cache-control')!, /no-store/);
+  const ticket = await response.json() as KitchenTicket;
+  assert.deepEqual(ticket.orders.map(order => order.orderNumber), [1, 2]); assert.equal(ticket.tableNumber, 207);
+  assert.equal(ticket.orders[0].items[0].nameEn, 'Snapshot Burger');
+  assert.equal(ticket.orders[0].items[0].options[0].removed[0].nameEn, 'Tomato');
+  assert.equal(ticket.orders[0].items[0].options[1].selected[0].nameEn, 'Extra Cheese');
+  assert.equal(ticket.orders[0].items[0].options[2].selected[0].nameEn, 'Spicy');
+  assert.equal(ticket.orders[0].items[0].note, 'NO MAYO\nAllergy: sesame');
+  assert.doesNotMatch(JSON.stringify(ticket), /price|subtotal|customerPhone|passwordHash|productId|tokenHash|lastKitchenPrintedBy/);
+  assert.equal(await KitchenPrintState.countDocuments({ unitId: batchId }), 0, 'GET/preview does not mark printed');
+  const before = await Order.find({ tableSessionId: visit._id }).lean();
+  const billPath = `/api/dashboard/tables/${table._id}/bill?sessionId=${visit._id}`;
+  const beforeBill = await (await staff.request(billPath)).json();
+  const requestId = randomUUID(); const payload = { expectedCount: 0, requestId };
+  const raced = await Promise.all([post(path, payload), post(path, payload)]);
+  for (const result of raced) { assert.equal(result.status, 200); assert.equal((await result.json()).count, 1); }
+  let state = await KitchenPrintState.findOne({ unitId: batchId }).orFail();
+  assert.equal(state.kitchenPrintCount, 1); assert.equal(String(state.lastKitchenPrintedBy), account.id);
+  assert.ok(state.kitchenPrintedAt); assert.equal(await KitchenPrintState.countDocuments({ unitId: batchId }), 1);
+  const reprint = await post(path, { expectedCount: 1, requestId: randomUUID() }); assert.equal(reprint.status, 200); assert.equal((await reprint.json()).count, 2);
+  assert.equal((await post(path, payload)).status, 409, 'stale replay never increments print count');
+  const distinctRace = await Promise.all([post(path, { expectedCount: 2, requestId: randomUUID() }), post(path, { expectedCount: 2, requestId: randomUUID() })]);
+  assert.deepEqual(distinctRace.map(r => r.status).sort(), [200, 409]);
+  state = await KitchenPrintState.findOne({ unitId: batchId }).orFail(); assert.equal(state.kitchenPrintCount, 3);
+  const after = await Order.find({ tableSessionId: visit._id }).lean();
+  const stable = (rows: typeof before) => rows.map(row => ({ ...row, __v: 0 }));
+  assert.deepEqual(stable(after), stable(before), 'printing preserves snapshots, status, money and all order timestamps');
+  const afterBill = await (await staff.request(billPath)).json();
+  assert.deepEqual(afterBill, beforeBill, 'printing cannot change final bill or its revision');
+  const live = await (await staff.request('/api/dashboard/orders')).json() as LiveOrdersSnapshot;
+  assert.ok(live.orders.filter(order => order.preparationBatchId === batchId).every(order => order.kitchenPrint?.count === 3));
+  const customerOrders = await (await fetch(`${base}/api/r/salt/tables/207/orders`, { headers: { cookie } })).text();
+  assert.doesNotMatch(customerOrders, /kitchenPrint|lastKitchenPrintedBy|lastRequestId/);
+  const ready = await post('/api/dashboard/orders/preparation', { orderIds: [String(first._id), String(second._id)], expectedStatus: 'PREPARING', status: 'READY' }, staff, base, 'PATCH');
+  assert.equal(ready.status, 200); assert.equal((await staff.request(path)).status, 409);
+  assert.equal((await post(path, { expectedCount: 3, requestId: randomUUID() })).status, 409, 'completed batches cannot start another print flow');
+  assert.equal((await Order.findById(late._id).orFail()).status, 'NEW');
+  const startLate = await post(`/api/dashboard/orders/${late._id}`, { expectedStatus: 'NEW', status: 'PREPARING' }, staff, base, 'PATCH'); assert.equal(startLate.status, 200);
+  const readyUnprinted = await post(`/api/dashboard/orders/${late._id}`, { expectedStatus: 'PREPARING', status: 'READY' }, staff, base, 'PATCH'); assert.equal(readyUnprinted.status, 200);
+  assert.equal(await KitchenPrintState.countDocuments({ unitId: late._id }), 0);
+  const takeaway = await Order.create({ restaurantId: fixture.restaurantId, fulfillmentType: 'TAKEAWAY', takeawaySessionId: new Types.ObjectId(), customerName: 'Kitchen Pickup', customerPhone: '0501234567', notes: 'Kitchen order note', orderNumber: 1, idempotencyKey: randomUUID(), status: 'PREPARING', preparingAt: new Date(), items, subtotal: 9600 });
+  const takeawayPath = `/api/dashboard/kitchen-print/order/${takeaway._id}`;
+  const takeawayTicket = await (await staff.request(takeawayPath)).json() as KitchenTicket;
+  assert.equal(takeawayTicket.fulfillmentType, 'TAKEAWAY'); assert.equal(takeawayTicket.customerName, 'Kitchen Pickup'); assert.equal(takeawayTicket.tableNumber, null); assert.ok(!JSON.stringify(takeawayTicket).includes('0501234567'));
+  assert.equal((await post(takeawayPath, { expectedCount: 0, requestId: randomUUID() })).status, 200);
+  const another = await Restaurant.findOne({ slug: 'other' }).orFail();
+  assert.equal(await KitchenPrintState.countDocuments({ restaurantId: another._id, unitId: batchId }), 0);
+  console.log('PASS: kitchen tickets scope complete stable batches, snapshots/options/notes, privacy, authenticated tenant isolation, idempotent concurrent counts/reprints, unchanged orders/bills and optional printing before Ready.');
+  return { takeawayId: String(takeaway._id) };
+}

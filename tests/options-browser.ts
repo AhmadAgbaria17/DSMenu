@@ -46,7 +46,7 @@ export async function runOptionsBrowserChecks(base: string, fixture: StaffFixtur
     await dialog.getByRole('checkbox', { name: /Extra Cheese/ }).check();
     await dialog.getByRole('checkbox', { name: /Egg/ }).check(); await expect(dialog.getByRole('checkbox', { name: /Extra Patty/ })).toBeDisabled(); await dialog.getByRole('checkbox', { name: /Egg/ }).uncheck();
     await dialog.getByRole('radio', { name: 'Spicy', exact: true }).check(); await expect(dialog.getByRole('radio', { name: 'Regular', exact: true })).not.toBeChecked();
-    await dialog.getByRole('button', { name: 'Increase Classic Burger quantity' }).click(); await dialog.getByRole('textbox', { name: 'Special requests (optional)' }).fill('Options browser note');
+    await dialog.getByRole('button', { name: 'Increase Classic Burger quantity' }).click(); await dialog.getByRole('textbox', { name: 'Order notes (optional)' }).fill('Options browser note');
     await expect(dialog.getByRole('button', { name: /Add to My Order/ })).toContainText('106.00'); await menu.screenshot({ path: 'test-artifacts/options-customer-en.png' });
     await dialog.getByRole('button', { name: /Add to My Order/ }).click(); await menu.reload(); await menu.getByTestId('my-order-button').click();
     await expect(menu.getByTestId('cart-subtotal')).toContainText('106.00'); await expect(menu.getByTestId('cart-line')).toContainText('Without: Tomato'); await expect(menu.getByTestId('cart-line')).toContainText('Extra Cheese');

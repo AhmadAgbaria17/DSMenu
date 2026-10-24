@@ -14,6 +14,7 @@ export async function priceOrder(input: OrderInput, restaurantId: Types.ObjectId
     if (invalid.length) throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, invalid);
     const items = input.items.map(item => {
       const product = catalog.get(item.productId)!;
+      if (product.allowCustomerNote === false && item.note) throw new CustomerRequestError('NOTES_DISABLED', 422, [item.productId]);
       let customization;
       try { customization = resolveOptions(optionGroupsSchema.parse(product.optionGroups ?? []), item.selections); }
       catch { throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, [item.productId]); }

@@ -44,6 +44,12 @@ export function LiveOrders({ initial, restaurantId }: { initial: LiveOrdersSnaps
     finally { if (request === sequence.current) setRefreshing(false); }
   }
   const reconcile = useEffectEvent((silent: boolean) => { void refresh(silent); });
+  useEffect(() => {
+    if (!('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('dsmenu-kitchen-print');
+    channel.onmessage = event => { if (event.data?.restaurantId === restaurantId) reconcile(true); };
+    return () => channel.close();
+  }, [restaurantId]);
   useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled && pulse.number) reconcile(pulse.silent); }); return () => { cancelled = true; }; }, [pulse.number, pulse.silent]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   async function mutate(id: string, url: string, payload: unknown) {

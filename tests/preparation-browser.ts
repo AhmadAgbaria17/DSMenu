@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium, expect, type Page } from '@playwright/test';
-import { Order, Table, TableSession, Product } from '../src/models';
+import { Order, Table, TableSession, Product, KitchenPrintState } from '../src/models';
 import { mockRealtime } from './realtime-transport';
 import type { StaffFixture } from './staff-http';
 import type { TableSessionBill } from '../src/types/table-bill';
@@ -46,6 +46,7 @@ export async function runPreparationBrowserChecks(base: string, fixture: StaffFi
     await expect(group.getByTestId(`staff-order-${first._id}`)).toContainText('Customer A: no mayo');
     await expect(group.getByTestId(`staff-order-${second._id}`)).toContainText('Customer B');
     await expect(group.getByRole('button', { name: 'Start preparing all', exact: true })).toHaveCount(1);
+    await expect(group.getByTestId('kitchen-print-action')).toHaveCount(0);
     await group.getByRole('button', { name: 'Start preparing all', exact: true }).click();
     await expect(group).toHaveCount(1);
     await expect(group).toContainText('2 orders preparing');
@@ -68,6 +69,8 @@ export async function runPreparationBrowserChecks(base: string, fixture: StaffFi
     const thirdCard = section.getByTestId(`staff-order-${third._id}`);
     await expect(thirdCard).toBeVisible(); await expect(group.getByTestId(`staff-order-${third._id}`)).toHaveCount(0);
     await expect(thirdCard.getByRole('button', { name: 'Start preparing', exact: true })).toBeVisible();
+    const { checkGroupedKitchenPrinting } = await import('./kitchen-print-browser');
+    await checkGroupedKitchenPrinting(dashboard, group, base, String(prepared[0].preparationBatchId));
     for (const [locale, messages] of [['ar', ar], ['he', he]] as const) {
       await staff.addCookies([{ name: 'dsmenu-language', value: locale, url: base }]); await dashboard.reload(); await expect(group.getByRole('button', { name: messages.LiveOrders.readyGroup, exact: true })).toBeVisible(); await expect(dashboard.locator('html')).toHaveAttribute('dir', 'rtl');
       for (const width of [390, 768, 1280]) { await dashboard.setViewportSize({ width, height: 900 }); assert.ok(await dashboard.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); }
@@ -85,6 +88,14 @@ export async function runPreparationBrowserChecks(base: string, fixture: StaffFi
     const billResponse = await staff.request.get(`${base}/api/dashboard/tables/${table._id}/bill?sessionId=${visit._id}`); assert.equal(billResponse.status(), 200);
     const bill = await billResponse.json() as TableSessionBill;
     assert.deepEqual(bill.orders.map(order => order.orderNumber), [1, 2, 3]); assert.equal(bill.finalTotal, first.subtotal + second.subtotal + third.subtotal); assert.equal(bill.canClose, false);
+    await dashboard.getByRole('button', { name: 'All active', exact: true }).click();
+    await thirdCard.getByRole('button', { name: 'Start preparing', exact: true }).click();
+    await expect(thirdCard.getByRole('link', { name: 'Print Kitchen Ticket', exact: true })).toBeVisible();
+    await thirdCard.getByRole('button', { name: 'Mark ready', exact: true }).click();
+    await expect(thirdCard).toHaveCount(0);
+    const unprinted = await Order.findById(third._id).orFail();
+    assert.equal(unprinted.status, 'READY');
+    assert.equal(await KitchenPrintState.countDocuments({ unitId: unprinted.preparationBatchId }), 0);
     assert.deepEqual(errors, []);
     assert.ok(bill.orders[0].items.some(item => item.productId === String(burger._id)));
     console.log('PASS: two Table 7 customers, realtime NEW grouping, one start/ready action, reload-stable preparation, separate later order, individual customer/history/bill totals and AR/HE/EN responsive layouts.');

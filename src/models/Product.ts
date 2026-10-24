@@ -11,6 +11,7 @@ const schema = new Schema({
   price: minorUnits,
   optionGroups: { type: [optionGroup], default: [], validate: (value: unknown) => optionGroupsSchema.safeParse(JSON.parse(JSON.stringify(value))).success },
   image: imageSchema,
+  allowCustomerNote: { type: Boolean, default: true },
   isAvailable: { type: Boolean, default: true },
   isFeatured: { type: Boolean, default: false },
   isArchived: { type: Boolean, default: false },

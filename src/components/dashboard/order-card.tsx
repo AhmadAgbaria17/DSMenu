@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/money';
 import { transitions, operationalStatus } from '@/lib/order-flow';
 import type { LiveOrder } from '@/types/live-orders';
 import type { OrderStatus } from '@/types/orders';
+import { KitchenPrintAction } from './kitchen-print-action';
 
 export function StaffOrderCard({ order, now, pending, update, hidePrimary = false }: { hidePrimary?: boolean; order: LiveOrder; now: number; pending: boolean; update: (order: LiveOrder, status: OrderStatus) => void }) {
   const t = useTranslations('LiveOrders');
@@ -20,7 +21,7 @@ export function StaffOrderCard({ order, now, pending, update, hidePrimary = fals
     <ul className="my-5 space-y-4">{order.items.map((item, index) => <li key={index}><p className="text-lg font-semibold">{item.quantity} × {localizedName(item, locale)}</p><OptionSummary groups={item.optionGroups} />{item.note && <p dir="auto" className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-amber-50 p-3 text-sm text-stone-700">{item.note}</p>}</li>)}</ul>
     {order.notes && <p dir="auto" className="mb-4 whitespace-pre-wrap break-words rounded-lg bg-amber-50 p-3">{order.notes}</p>}
     <p className="border-t border-stone-100 pt-4 text-end text-xl font-bold"><bdi>{formatMoney(order.subtotal, locale, order.currency)}</bdi></p>
-    <div className="mt-5 flex flex-wrap gap-3">{!hidePrimary && transitions[order.status].filter(status => status !== 'CANCELLED').map(status => <button type="button" key={status} disabled={pending} onClick={() => update(order, status)} className="min-h-14 flex-1 rounded-xl bg-emerald-950 px-5 font-bold text-white">{pending ? t('updating') : t(`actions.${status}`)}</button>)}</div>
+    <div className="mt-5 flex flex-wrap items-end gap-3">{!hidePrimary && <KitchenPrintAction order={order} pending={pending} />}{!hidePrimary && transitions[order.status].filter(status => status !== 'CANCELLED').map(status => <button type="button" key={status} disabled={pending} onClick={() => update(order, status)} className="min-h-14 flex-1 rounded-xl bg-emerald-950 px-5 font-bold text-white">{pending ? t('updating') : t(`actions.${status}`)}</button>)}</div>
     {transitions[order.status].includes('CANCELLED') && <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm">{t('moreActions')}</summary><button type="button" disabled={pending} className="min-h-12 rounded-xl border border-red-200 px-5 font-bold text-red-800" onClick={() => { if (window.confirm(t('cancelConfirm'))) update(order, 'CANCELLED'); }}>{t('actions.CANCELLED')}</button></details>}
   </article>;
 }

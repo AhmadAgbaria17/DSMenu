@@ -23,7 +23,8 @@ export function ProductDetails({ product, currency, onClose, onAdded }: {
   const menu = useTranslations('Menu');
   const cart = useCart();
   const [quantity, setQuantity] = useState(1);
-  const [note, setNote] = useState('');
+  const [draftNote, setNote] = useState('');
+  const note = product.allowCustomerNote === false ? '' : draftNote;
   const [selections, setSelections] = useState(() => defaultSelections(product.optionGroups));
   let validOptions = true;
   try { resolveOptions(product.optionGroups, selections); } catch { validOptions = false; }
@@ -47,7 +48,7 @@ export function ProductDetails({ product, currency, onClose, onAdded }: {
       {!product.isAvailable ? <p className="rounded-xl bg-stone-100 p-4 text-stone-700">{menu('unavailable')}</p> : <>
         <OptionSelector groups={product.optionGroups ?? []} selections={selections} onChange={setSelections} currency={currency} />
         <div className="flex flex-wrap items-center justify-between gap-4"><span className="font-bold">{t('quantity')}</span><QuantityControl quantity={quantity} name={name} onChange={setQuantity} /></div>
-        <div><label htmlFor={noteId} className="mb-2 block font-bold">{t('note')}</label><textarea id={noteId} value={note} onChange={event => setNote(event.target.value)} maxLength={MAX_NOTE_LENGTH} rows={3} placeholder={t('notePlaceholder')} className="w-full resize-y rounded-xl border border-stone-300 p-4 text-base" /><p className="mt-1 text-end text-xs text-stone-500">{t('noteLimit', { count: note.length, max: MAX_NOTE_LENGTH })}</p></div>
+        {product.allowCustomerNote !== false && <div><label htmlFor={noteId} className="mb-2 block font-bold">{t('note')}</label><textarea id={noteId} value={note} onChange={event => setNote(event.target.value)} maxLength={MAX_NOTE_LENGTH} rows={3} placeholder={t('notePlaceholder')} className="w-full resize-y rounded-xl border border-stone-300 p-4 text-base" /><p className="mt-1 text-end text-xs text-stone-500">{t('noteLimit', { count: note.length, max: MAX_NOTE_LENGTH })}</p></div>}
       </>}
       {!cart.canOrder && <p className="text-sm text-amber-900">{t('selectTable')}</p>}
       {(quantity > remaining || full) && <p role="status" className="text-sm text-amber-900">{t('limit')}</p>}

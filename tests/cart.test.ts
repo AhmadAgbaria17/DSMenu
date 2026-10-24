@@ -18,6 +18,21 @@ const scope = { restaurantId: '000000000000000000000100', tableNumber: 7 };
 const empty: CartState = { items: [], hydrated: true };
 const add = (state = empty, note = '', quantity = 1) => cartReducer(state, { type: 'add', productId: product.id, note, quantity }, products);
 
+test('disabled notes reject new input and preserve stale instructions for explicit review without changing line identity', () => {
+  const catalog = [{ ...product, allowCustomerNote: false }];
+  assert.equal(cartReducer(empty, { type: 'add', productId: product.id, quantity: 1, note: 'Cut in half' }, catalog), empty);
+  const original = add(empty, 'Cut in half');
+  const restored = parseCart(serializeCart(original.items, scope), scope, catalog);
+  assert.equal(restored.items[0].note, 'Cut in half');
+  assert.equal(getCartSummary(restored.items, catalog).lines[0].needsReview, true);
+  const state = { ...empty, items: restored.items };
+  assert.equal(cartReducer(state, { type: 'note', key: cartLineKey(state.items[0]), note: 'New instruction' }, catalog), state);
+  const cleared = cartReducer(state, { type: 'note', key: cartLineKey(state.items[0]), note: '' }, catalog);
+  assert.equal(cleared.items[0].note, '');
+  assert.equal(getCartSummary(cleared.items, catalog).lines[0].needsReview, false);
+  assert.equal(getCartSummary(original.items, products).lines[0].needsReview, false, 'absent field preserves legacy notes');
+});
+
 test('add merges same product and trimmed note, but preserves different requests', () => {
   const first = add(empty, ' No onion ', 2);
   const merged = add(first, 'No onion', 3);

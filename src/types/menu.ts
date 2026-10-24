@@ -29,7 +29,7 @@ export type PublicProduct = LocalizedName & {
   price: number;
   image: PublicImage | null;
   isAvailable: boolean;
-  isFeatured: boolean;
+  allowCustomerNote?: boolean; isFeatured: boolean;
   sortOrder: number;
 };
 export type PublicMenu = {

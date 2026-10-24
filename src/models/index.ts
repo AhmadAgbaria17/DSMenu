@@ -10,3 +10,4 @@ export { ServiceCall } from './ServiceCall';
 export { TakeawaySession } from './TakeawaySession';
 
 export { ProductOptionTemplate } from './ProductOptionTemplate';
+export { KitchenPrintState } from './KitchenPrintState';

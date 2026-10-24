@@ -91,7 +91,7 @@ export function cartReducer(state: CartState, action: CartAction, products: Publ
       if (!state.hydrated || !noteSchema.safeParse(action.note).success || !Number.isInteger(action.quantity) || action.quantity < 1 || action.quantity > MAX_QUANTITY) return state;
       const next = { productId: action.productId, quantity: action.quantity, note: action.note.trim(), ...(action.selections ? { selections: canonicalSelections(action.selections) } : {}) };
       const product = products.find(p => p.id === action.productId);
-      try { if (!product) return state; resolveOptions(product.optionGroups, action.selections); } catch { return state; }
+      try { if (!product || (product.allowCustomerNote === false && next.note)) return state; resolveOptions(product.optionGroups, action.selections); } catch { return state; }
       const key = cartLineKey(next);
       const existing = items.find(item => cartLineKey(item) === key);
       if (!existing && items.length >= MAX_CART_LINES) return state;
@@ -102,7 +102,7 @@ export function cartReducer(state: CartState, action: CartAction, products: Publ
     case 'note': {
       const parsed = noteSchema.safeParse(action.note);
       const current = items.find(item => cartLineKey(item) === action.key);
-      if (!parsed.success || !current) return state;
+      if (!parsed.success || !current || (parsed.data && products.find(product => product.id === current.productId)?.allowCustomerNote === false)) return state;
       const matching = items.find(item => cartLineKey(item) !== action.key && cartLineKey(item) === cartLineKey({ ...current, note: parsed.data }));
       // Never silently discard quantities when edited notes merge two lines.
       if (matching && matching.quantity + current.quantity > MAX_QUANTITY) return state;
@@ -123,7 +123,7 @@ export function getCartSummary(items: CartItem[], products: PublicProduct[]) {
     try {
       const options = resolveOptions(product.optionGroups, item.selections);
       const unitPrice = product.price + options.optionsTotal;
-      return [{ ...item, product, unitPrice, needsReview: false, optionGroups: options.optionGroups, itemTotal: unitPrice * item.quantity }];
+      return [{ ...item, product, unitPrice, needsReview: product.allowCustomerNote === false && !!item.note, optionGroups: options.optionGroups, itemTotal: unitPrice * item.quantity }];
     } catch { return [{ ...item, product, unitPrice: product.price, needsReview: true, optionGroups: [], itemTotal: 0 }]; }
   });
   return {

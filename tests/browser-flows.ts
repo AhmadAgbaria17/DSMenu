@@ -54,7 +54,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAccessibleName('Classic Burger');
     await dialog.getByRole('button', { name: 'Increase Classic Burger quantity' }).click();
-    await dialog.getByRole('textbox', { name: 'Special requests (optional)' }).fill('No onion');
+    await dialog.getByRole('textbox', { name: 'Order notes (optional)' }).fill('No onion');
     await page.screenshot({ path: `${artifacts}/product-en-mobile.png` });
     await dialog.getByRole('button', { name: /Add to My Order/ }).click();
     await expect(dialog).toHaveCount(0);

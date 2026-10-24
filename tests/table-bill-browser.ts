@@ -32,7 +32,7 @@ export async function runBillBrowserChecks(base: string, fixture: StaffFixture) 
     await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
     await menu.getByRole('dialog').getByRole('button', { name: 'Increase Classic Burger quantity' }).click();
     await menu.getByRole('checkbox', { name: 'Tomato', exact: true }).uncheck();
-    await menu.getByRole('textbox', { name: 'Special requests (optional)' }).fill('Final bill note');
+    await menu.getByRole('textbox', { name: 'Order notes (optional)' }).fill('Final bill note');
     await menu.getByRole('dialog').getByRole('button', { name: /Add to My Order/ }).click();
     await menu.locator('[data-product-id="' + fries._id + '"]').first().getByRole('button', { name: 'Add Fries', exact: true }).click();
     await menu.getByRole('dialog').getByRole('button', { name: /Add to My Order/ }).click();
