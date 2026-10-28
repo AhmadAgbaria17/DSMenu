@@ -11,7 +11,7 @@ export function KitchenPrintPreview({ initial }: { initial: KitchenTicket }) {
   const [ticket, setTicket] = useState(initial);
   const [width, setWidth] = useState<'80' | '58'>('80');
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<'failed' | 'conflict' | 'unavailable' | null>(null);
+  const [error, setError] = useState<'failed' | 'conflict' | 'unavailable' | 'disabled' | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const busy = useRef(false);
   // Preserve an uncertain attempt across network retries; reprints get new IDs.
@@ -24,6 +24,7 @@ export function KitchenPrintPreview({ initial }: { initial: KitchenTicket }) {
     try {
       await document.fonts.ready;
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(attempt.current), signal: AbortSignal.timeout(15_000) });
+      if (response.status === 403) { setUnavailable(true); setError('disabled'); return; }
       if (response.status === 409) {
         const fresh = await fetch(endpoint, { cache: 'no-store' });
         if (fresh.ok) { setTicket(await fresh.json() as KitchenTicket); setError('conflict'); }
@@ -46,6 +47,7 @@ export function KitchenPrintPreview({ initial }: { initial: KitchenTicket }) {
     } catch { setError('failed'); }
     finally { busy.current = false; setPending(false); }
   }
+  if (error === 'disabled') return <main className="mx-auto max-w-xl p-8"><p role="alert" className="text-2xl font-bold">{t('disabled')}</p><Link href="/dashboard/orders" className="mt-6 inline-block min-h-12 underline">{t('back')}</Link></main>;
   return <main className="kitchen-print-page" data-paper-width={width}>
     <div className="kitchen-print-controls" aria-busy={pending}>
       <h1 className="text-2xl font-bold">{t('title')}</h1>

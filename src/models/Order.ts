@@ -35,6 +35,7 @@ const schema = new Schema({
 }, { timestamps: true });
 schema.index({ restaurantId: 1, status: 1, createdAt: -1 });
 schema.index({ restaurantId: 1, createdAt: -1 });
+schema.index({ restaurantId: 1, tableSessionId: 1 }, { name: 'session_order_history' });
 schema.index({ tableSessionId: 1, orderNumber: 1 }, { name: 'table_order_number', unique: true, partialFilterExpression: { tableSessionId: { $type: 'objectId' } } });
 schema.index({ restaurantId: 1, tableSessionId: 1, idempotencyKey: 1 }, { name: 'table_idempotency', unique: true, partialFilterExpression: { tableSessionId: { $type: 'objectId' } } });
 schema.index({ takeawaySessionId: 1, orderNumber: 1 }, { name: 'takeaway_order_number', unique: true, partialFilterExpression: { takeawaySessionId: { $type: 'objectId' } } });

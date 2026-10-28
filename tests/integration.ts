@@ -20,6 +20,7 @@ async function main() {
   process.env.AUTH_URL = 'http://localhost:3107';
   process.env.NEXTAUTH_URL = process.env.AUTH_URL;
   process.env.APP_URL = process.env.AUTH_URL;
+  process.env.CRON_SECRET = randomBytes(32).toString('base64url');
   let server: ReturnType<typeof spawn> | undefined;
   let logs = '';
   let stopRealtime: (() => Promise<void>) | undefined;
@@ -176,6 +177,8 @@ async function main() {
     const { runCustomerNotesHttpChecks } = await import('./customer-notes-http');
     const notesFixture = await runCustomerNotesHttpChecks(base, staffFixture);
     if (process.argv.includes('--browser')) { const { runCustomerNotesBrowserChecks } = await import('./customer-notes-browser'); await runCustomerNotesBrowserChecks(base, staffFixture, notesFixture); }
+    const { runEmptyTableSessionChecks } = await import('./empty-table-sessions-http');
+    await runEmptyTableSessionChecks(base, staffFixture);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

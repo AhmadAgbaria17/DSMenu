@@ -10,6 +10,7 @@ const schema = new Schema({
 }, { timestamps: true });
 schema.index({ restaurantId: 1, status: 1, createdAt: -1 });
 schema.index({ restaurantId: 1, createdAt: -1 });
+schema.index({ restaurantId: 1, tableSessionId: 1, status: 1 }, { name: 'session_unresolved_calls' });
 schema.index({ restaurantId: 1, tableSessionId: 1, type: 1, createdAt: -1 });
 schema.index({ tableSessionId: 1, type: 1 }, {
   unique: true, partialFilterExpression: { status: { $in: ['PENDING', 'ACKNOWLEDGED'] } },

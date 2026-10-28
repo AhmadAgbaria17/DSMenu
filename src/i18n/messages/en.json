@@ -1,5 +1,9 @@
 {
   "Kitchen": {
+    "settingsTitle": "Kitchen Settings",
+    "enablePrinting": "Enable kitchen ticket printing",
+    "settingsHint": "When enabled, staff can print a kitchen preparation ticket after starting preparation.",
+    "disabled": "Kitchen ticket printing is disabled for this restaurant.",
     "title": "Kitchen preparation ticket",
     "print": "Print Kitchen Ticket",
     "reprint": "Reprint Kitchen Ticket",

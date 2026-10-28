@@ -1,4 +1,5 @@
 import 'server-only';
+import { closeEmptyTableSessions } from './empty-table-sessions';
 import mongoose from 'mongoose';
 import { Table, TableSession, Order, ServiceCall, Restaurant } from '@/models';
 import { requireStaffApi, StaffApiError } from '@/lib/staff-http';
@@ -14,6 +15,7 @@ import type { TableSnapshot } from '@/types/tables';
 
 export async function getManagedTables(): Promise<TableSnapshot> {
   const staff = await requireStaffApi(); const scope = { restaurantId: staff.restaurantId };
+  await closeEmptyTableSessions(scope);
   const [restaurant, tables, visits, orders, calls] = await Promise.all([
     Restaurant.findById(staff.restaurantId).select('name slug logo').lean().orFail(),
     Table.find(scope).sort({ tableNumber: 1 }).lean(),
@@ -60,7 +62,7 @@ export async function closeTableVisit(id: string, payload: unknown) {
     if (!table) throw new StaffApiError('NOT_FOUND', 404);
     // The visit write conflicts with order/service creation. Transaction retries see
     // committed requests before allowing closure; a stale ID cannot close a new visit.
-    const visit = await TableSession.findOneAndUpdate({ _id: parsed.data.sessionId, restaurantId: staff.restaurantId, tableId: id, status: 'ACTIVE' }, { $set: { status: 'CLOSED', closedAt: new Date() } }, { session });
+    const visit = await TableSession.findOneAndUpdate({ _id: parsed.data.sessionId, restaurantId: staff.restaurantId, tableId: id, status: 'ACTIVE' }, { $set: { status: 'CLOSED', closedAt: new Date(), closeReason: 'MANUAL' } }, { session });
     if (!visit) throw new StaffApiError('CONFLICT', 409);
     const bill = await readSessionBill(staff.restaurantId, id, parsed.data.sessionId, session);
     if (bill.activeOrders) throw new StaffApiError('ACTIVE_ORDERS', 409);

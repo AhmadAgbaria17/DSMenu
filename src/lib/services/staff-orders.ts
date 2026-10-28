@@ -1,5 +1,5 @@
 import 'server-only';
-import { Order, Table, KitchenPrintState } from '@/models';
+import { Order, Table, KitchenPrintState, Restaurant } from '@/models';
 import { kitchenUnit, kitchenUnitKey } from '@/lib/kitchen-print';
 import { requireStaffApi, StaffApiError } from '@/lib/staff-http';
 import { unfinishedOrderStatuses, canTransition, statusChangeSchema } from '@/lib/order-flow';
@@ -11,6 +11,7 @@ import type { LiveOrdersSnapshot } from '@/types/live-orders';
 
 export async function getRestaurantOrders(): Promise<LiveOrdersSnapshot> {
   const staff = await requireStaffApi();
+  const restaurant = await Restaurant.findById(staff.restaurantId).select('kitchenPrintingEnabled').lean().orFail();
   const scope = { restaurantId: staff.restaurantId };
   const [active, history] = await Promise.all([
     Order.find({ ...scope, status: { $in: unfinishedOrderStatuses } }).sort({ createdAt: 1, _id: 1 }).lean(),
@@ -21,7 +22,7 @@ export async function getRestaurantOrders(): Promise<LiveOrdersSnapshot> {
   const printStates = new Map(prints.map(state => [`${state.unitType}:${state.unitId}`, { count: state.kitchenPrintCount, printedAt: state.kitchenPrintedAt.toISOString() }]));
   const tables = await Table.find({ ...scope, _id: { $in: all.map(order => order.tableId) } }).select('_id tableNumber').lean();
   const numbers = new Map(tables.map(table => [String(table._id), table.tableNumber]));
-  return { fetchedAt: new Date().toISOString(), realtime: realtimeConfig(restaurantChannel(staff.restaurantId)), orders: all.map(order => ({ ...orderDto(order), kitchenPrint: printStates.get(kitchenUnitKey(kitchenUnit({ id: String(order._id), preparationBatchId: order.preparationBatchId ? String(order.preparationBatchId) : undefined }))) ?? { count: 0, printedAt: null }, ...(order.tableId ? { tableId: String(order.tableId) } : {}), ...(order.preparationBatchId ? { preparationBatchId: String(order.preparationBatchId) } : {}), tableNumber: numbers.get(String(order.tableId)) ?? null, tableSessionId: order.tableSessionId ? String(order.tableSessionId) : null, ...(order.fulfillmentType === 'TAKEAWAY' ? { takeawaySessionId: String(order.takeawaySessionId), customerName: order.customerName ?? '', customerPhone: order.customerPhone ?? '' } : {}), updatedAt: order.updatedAt.toISOString(), notes: order.notes })) };
+  return { kitchenPrintingEnabled: restaurant.kitchenPrintingEnabled !== false, fetchedAt: new Date().toISOString(), realtime: realtimeConfig(restaurantChannel(staff.restaurantId)), orders: all.map(order => ({ ...orderDto(order), kitchenPrint: printStates.get(kitchenUnitKey(kitchenUnit({ id: String(order._id), preparationBatchId: order.preparationBatchId ? String(order.preparationBatchId) : undefined }))) ?? { count: 0, printedAt: null }, ...(order.tableId ? { tableId: String(order.tableId) } : {}), ...(order.preparationBatchId ? { preparationBatchId: String(order.preparationBatchId) } : {}), tableNumber: numbers.get(String(order.tableId)) ?? null, tableSessionId: order.tableSessionId ? String(order.tableSessionId) : null, ...(order.fulfillmentType === 'TAKEAWAY' ? { takeawaySessionId: String(order.takeawaySessionId), customerName: order.customerName ?? '', customerPhone: order.customerPhone ?? '' } : {}), updatedAt: order.updatedAt.toISOString(), notes: order.notes })) };
 }
 export async function updateOrderStatus(id: string, payload: unknown) {
   const staff = await requireStaffApi();

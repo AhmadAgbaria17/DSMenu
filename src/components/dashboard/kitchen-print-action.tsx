@@ -3,9 +3,9 @@ import { useTranslations } from 'next-intl';
 import { kitchenUnit, kitchenPrintUrl } from '@/lib/kitchen-print';
 import type { LiveOrder } from '@/types/live-orders';
 
-export function KitchenPrintAction({ order, pending }: { order: LiveOrder; pending: boolean }) {
+export function KitchenPrintAction({ order, pending, enabled }: { enabled: boolean; order: LiveOrder; pending: boolean }) {
   const t = useTranslations('Kitchen');
-  if (order.status !== 'PREPARING') return null;
+  if (!enabled || order.status !== 'PREPARING') return null;
   const count = order.kitchenPrint?.count ?? 0;
   return <div className="flex flex-1 flex-col gap-2" data-testid="kitchen-print-action">
     {count > 0 && <span role="status" className="text-sm font-bold text-emerald-900">{t('printed', { count })}</span>}

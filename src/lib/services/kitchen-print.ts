@@ -6,6 +6,13 @@ import { kitchenUnitSchema, kitchenPrintInput, type KitchenUnit, type KitchenPri
 import { isDuplicateKey } from '@/lib/customer-errors';
 import type { KitchenTicket } from '@/types/kitchen-ticket';
 
+async function requireKitchenPrinting(restaurantId: string) {
+  const restaurant = await Restaurant.findById(restaurantId).select('name kitchenPrintingEnabled').lean();
+  if (!restaurant) throw new StaffApiError('NOT_FOUND', 404);
+  if (restaurant.kitchenPrintingEnabled === false) throw new StaffApiError('KITCHEN_PRINTING_DISABLED', 403);
+  return restaurant;
+}
+
 async function preparingOrders(restaurantId: string, unit: KitchenUnit, session: ClientSession | null = null) {
   const orders = await Order.find({ restaurantId, ...(unit.kind === 'batch'
     ? { preparationBatchId: unit.id }
@@ -22,9 +29,9 @@ export async function getKitchenTicket(input: unknown): Promise<KitchenTicket> {
   const parsed = kitchenUnitSchema.safeParse(input);
   if (!parsed.success) throw new StaffApiError('INVALID_REQUEST', 400);
   const unit = parsed.data;
+  const restaurant = await requireKitchenPrinting(staff.restaurantId);
   const orders = await preparingOrders(staff.restaurantId, unit);
-  const [restaurant, table, state] = await Promise.all([
-    Restaurant.findById(staff.restaurantId).select('name').lean().orFail(),
+  const [table, state] = await Promise.all([
     orders[0].tableId ? Table.findOne({ _id: orders[0].tableId, restaurantId: staff.restaurantId }).select('tableNumber').lean() : null,
     KitchenPrintState.findOne({ restaurantId: staff.restaurantId, unitType: unit.kind, unitId: unit.id }).lean(),
   ]);
@@ -49,9 +56,14 @@ export async function recordKitchenPrint(input: unknown, payload: unknown): Prom
   if (!parsed.success || !body.success) throw new StaffApiError('INVALID_REQUEST', 400);
   const unit = parsed.data; const { expectedCount, requestId } = body.data;
   const scope = { restaurantId: staff.restaurantId, unitType: unit.kind, unitId: unit.id };
+  await requireKitchenPrinting(staff.restaurantId);
   const indexes = await KitchenPrintState.collection.indexes();
   if (!indexes.some(index => index.name === 'kitchen_print_unit' && index.unique)) throw new Error('Apply kitchen print indexes before printing.');
   const execute = () => mongoose.connection.transaction(async session => {
+    // Serialize with settings edits: a concurrent disable cannot be bypassed by
+    // an earlier settings read. This technical write leaves timestamps unchanged.
+    const allowed = await Restaurant.updateOne({ _id: staff.restaurantId, kitchenPrintingEnabled: { $ne: false } }, { $inc: { __v: 1 } }, { session, timestamps: false });
+    if (!allowed.matchedCount) throw new StaffApiError('KITCHEN_PRINTING_DISABLED', 403);
     const orders = await preparingOrders(staff.restaurantId, unit, session);
     const current = await KitchenPrintState.findOne(scope).select('+lastRequestId').session(session).lean();
     // A retry of the same initiated print must not count as an intentional reprint.

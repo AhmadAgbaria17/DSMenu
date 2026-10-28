@@ -1,4 +1,5 @@
 import 'server-only';
+import { closeEmptyTableSessions } from './empty-table-sessions';
 import mongoose, { type ClientSession } from 'mongoose';
 import { Restaurant, Table, TableSession } from '@/models';
 import { connectMongo } from '@/lib/mongodb';
@@ -37,6 +38,7 @@ export async function requireCustomerVisit(target: CustomerTable, token: string 
 }
 
 export async function establishCustomerVisit(target: CustomerTable, existingToken?: string) {
+  await closeEmptyTableSessions({ restaurantId: target.restaurant._id, tableId: target.table._id });
   if (existingToken && tokenHash(existingToken)) {
     try {
       const visit = await requireCustomerVisit(target, existingToken);

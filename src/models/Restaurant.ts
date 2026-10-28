@@ -1,4 +1,4 @@
-import { Schema } from 'mongoose';
+import { Schema, models, deleteModel } from 'mongoose';
 import { languages } from '@/types/domain';
 import { cachedModel, imageSchema } from './shared';
 
@@ -15,6 +15,7 @@ const schema = new Schema({
   currency: { type: String, enum: ['ILS'], default: 'ILS' },
   defaultLanguage: { type: String, enum: languages, default: 'ar' },
   enabledLanguages: { type: [String], enum: languages, default: ['ar', 'he', 'en'], validate: (v: string[]) => v.length > 0 && new Set(v).size === v.length },
+  kitchenPrintingEnabled: { type: Boolean, default: true },
   hideUnavailableProducts: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
@@ -22,4 +23,5 @@ schema.index({ slug: 1 }, { unique: true });
 schema.pre('validate', function () {
   if (!this.enabledLanguages.includes(this.defaultLanguage)) this.invalidate('defaultLanguage', 'Default language must be enabled.');
 });
+if (models.Restaurant && !models.Restaurant.schema.path('kitchenPrintingEnabled')) deleteModel('Restaurant');
 export const Restaurant = cachedModel('Restaurant', schema);

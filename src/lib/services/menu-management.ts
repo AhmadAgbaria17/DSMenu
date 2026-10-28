@@ -20,7 +20,7 @@ export async function getManagedMenu(): Promise<ManagedMenu> {
   return {
     categories: categories.map(c => ({ id: String(c._id), nameAr: c.nameAr, nameHe: c.nameHe, nameEn: c.nameEn, sortOrder: c.sortOrder, isActive: c.isActive, image: image(c.image) })),
     products: products.map(p => ({ id: String(p._id), categoryId: String(p.categoryId), nameAr: p.nameAr, nameHe: p.nameHe, nameEn: p.nameEn, descriptionAr: p.descriptionAr, descriptionHe: p.descriptionHe, descriptionEn: p.descriptionEn, optionGroups: optionGroupsSchema.parse(p.optionGroups ?? []), price: p.price, sortOrder: p.sortOrder, isAvailable: p.isAvailable, isFeatured: p.isFeatured, allowCustomerNote: p.allowCustomerNote !== false, isArchived: p.isArchived, image: image(p.image) })),
-    restaurant: { id: String(restaurant._id), name: restaurant.name, slug: restaurant.slug, description: restaurant.description, phone: restaurant.phone ?? '', whatsapp: restaurant.whatsapp ?? '', address: restaurant.address ?? '', googleMapsUrl: restaurant.googleMapsUrl ?? '', instagramUrl: restaurant.instagramUrl ?? '', primaryColor: restaurant.primaryColor, logo: image(restaurant.logo), coverImage: image(restaurant.coverImage) },
+    restaurant: { kitchenPrintingEnabled: restaurant.kitchenPrintingEnabled !== false, id: String(restaurant._id), name: restaurant.name, slug: restaurant.slug, description: restaurant.description, phone: restaurant.phone ?? '', whatsapp: restaurant.whatsapp ?? '', address: restaurant.address ?? '', googleMapsUrl: restaurant.googleMapsUrl ?? '', instagramUrl: restaurant.instagramUrl ?? '', primaryColor: restaurant.primaryColor, logo: image(restaurant.logo), coverImage: image(restaurant.coverImage) },
   };
 }
 export async function saveCategory(payload: unknown, id?: string) {

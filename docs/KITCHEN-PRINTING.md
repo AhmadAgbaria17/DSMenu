@@ -6,6 +6,24 @@ order status, money, snapshots, order timestamps, bill totals or analytics.
 
 ## Staff workflow
 
+Restaurant Settings → Kitchen Settings contains **Enable kitchen ticket printing**.
+The restaurant's `kitchenPrintingEnabled` boolean defaults to true, including
+legacy documents without the field. Both OWNER and STAFF use the existing settings
+permissions. Disabling hides all operational Print/Reprint/count indicators on
+grouped, standalone and takeaway orders; Start Preparing and Mark Ready remain
+independent. Live Orders picks up the setting through its existing refresh,
+focus/revalidation or page revisit behavior.
+
+The protected ticket service checks the authenticated restaurant setting before
+loading ticket data. Disabled API GET/POST requests return 403 with
+`KITCHEN_PRINTING_DISABLED`; the preview page renders a localized disabled message
+instead of a ticket. An already-open preview also handles a rejected print attempt.
+Print recording checks the setting again transactionally using a technical
+restaurant version write, serializing against concurrent settings changes.
+No print history is deleted or reset; re-enabling restores the saved indicators.
+No field migration, new environment variable, dependency or index is required for
+this switch. Older settings clients omitting the field preserve the stored value.
+
 1. Open Live Orders and start preparation.
 2. A **Print Kitchen Ticket** action appears next to **Mark Ready** only for an
    actual `PREPARING` unit. A grouped batch has one action for the whole batch.

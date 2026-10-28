@@ -3,6 +3,7 @@ import { chromium, expect, type Locator, type Page } from '@playwright/test';
 import { KitchenPrintState } from '../src/models';
 import ar from '../src/i18n/messages/ar.json';
 import he from '../src/i18n/messages/he.json';
+import en from '../src/i18n/messages/en.json';
 
 export async function checkGroupedKitchenPrinting(dashboard: Page, group: Locator, base: string, batchId: string) {
   const context = dashboard.context();
@@ -37,6 +38,40 @@ export async function checkGroupedKitchenPrinting(dashboard: Page, group: Locato
       await dashboard.bringToFront(); await expect(group.getByRole('status')).toHaveText('✓ Printed ×2');
       assert.equal((await KitchenPrintState.findOne({ unitId: batchId }).orFail()).kitchenPrintCount, 2);
     } finally { await again.close(); }
+    const settings = await context.newPage();
+    try {
+      async function toggle(enabled: boolean) {
+        await settings.goto(base + '/dashboard/settings');
+        await settings.getByLabel(en.Kitchen.enablePrinting, { exact: true }).setChecked(enabled);
+        await settings.getByRole('button', { name: 'Save', exact: true }).click();
+        await expect(settings.getByText('Saved successfully', { exact: true })).toBeVisible();
+      }
+      await toggle(false);
+      await dashboard.reload();
+      await expect(group.getByTestId('kitchen-print-action')).toHaveCount(0);
+      await expect(group.getByRole('status')).toHaveCount(0);
+      await expect(group.getByRole('button', { name: en.LiveOrders.readyGroup, exact: true })).toBeEnabled();
+      // An already-open preview must also be denied when it attempts to print.
+      await preview.getByRole('button', { name: 'Reprint Kitchen Ticket', exact: true }).click();
+      await expect(preview.getByRole('main').getByRole('alert')).toHaveText(en.Kitchen.disabled);
+      assert.equal(await preview.evaluate(() => (window as Window & { printCalls?: number }).printCalls), 1);
+      await preview.reload();
+      await expect(preview.getByRole('heading', { name: en.Kitchen.disabled, exact: true })).toBeVisible();
+      await expect(preview.getByTestId('kitchen-ticket')).toHaveCount(0);
+      for (const [locale, messages] of [['ar', ar], ['he', he], ['en', en]] as const) {
+        await context.addCookies([{ name: 'dsmenu-language', value: locale, url: base }]);
+        await settings.reload();
+        await expect(settings.getByRole('heading', { name: messages.Kitchen.settingsTitle, exact: true })).toBeVisible();
+        await expect(settings.getByLabel(messages.Kitchen.enablePrinting, { exact: true })).not.toBeChecked();
+        await expect(settings.getByText(messages.Kitchen.settingsHint, { exact: true })).toBeVisible();
+        await expect(settings.locator('html')).toHaveAttribute('dir', locale === 'en' ? 'ltr' : 'rtl');
+        await preview.reload(); await expect(preview.getByRole('heading', { name: messages.Kitchen.disabled, exact: true })).toBeVisible();
+      }
+      await toggle(true); await dashboard.reload();
+      await expect(group.getByRole('link', { name: 'Reprint Kitchen Ticket', exact: true })).toBeVisible();
+      await expect(group.getByRole('status')).toHaveText('✓ Printed ×2');
+      assert.equal((await KitchenPrintState.findOne({ unitId: batchId }).orFail()).kitchenPrintCount, 2);
+    } finally { await settings.close(); }
     for (const locale of ['en', 'ar', 'he']) {
       await context.addCookies([{ name: 'dsmenu-language', value: locale, url: base }]); await preview.reload();
       await expect(preview.locator('html')).toHaveAttribute('dir', locale === 'en' ? 'ltr' : 'rtl');
@@ -76,6 +111,26 @@ export async function runKitchenTakeawayBrowserChecks(base: string, password: st
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await ticket.screenshot({ path: `test-artifacts/kitchen-takeaway-options-${width}mm.png` });
     }
-    console.log('PASS: one grouped print action, later order exclusion, notes/options, print/reprint indicators, standalone private ticket, AR/HE/EN RTL and measured 80/58mm print/PDF layouts.');
+    const settings = await context.newPage();
+    try {
+      await settings.goto(base + '/dashboard/settings');
+      await settings.getByLabel(en.Kitchen.enablePrinting, { exact: true }).uncheck();
+      await settings.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(settings.getByText('Saved successfully', { exact: true })).toBeVisible();
+      await page.goto(base + '/dashboard/orders');
+      const card = page.getByTestId(`staff-order-${orderId}`);
+      await expect(card.getByTestId('kitchen-print-action')).toHaveCount(0);
+      await expect(card.getByRole('button', { name: 'Mark ready', exact: true })).toBeEnabled();
+      await page.goto(`${base}/print/kitchen/order/${orderId}`);
+      await expect(page.getByRole('heading', { name: en.Kitchen.disabled, exact: true })).toBeVisible();
+      await expect(page.getByTestId('kitchen-ticket')).toHaveCount(0);
+      await settings.getByLabel(en.Kitchen.enablePrinting, { exact: true }).check();
+      await settings.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(settings.getByText('Saved successfully', { exact: true })).toBeVisible();
+      await page.goto(base + '/dashboard/orders');
+      await expect(card.getByRole('link', { name: en.Kitchen.reprint, exact: true })).toBeVisible();
+      assert.equal((await KitchenPrintState.findOne({ unitId: orderId }).orFail()).kitchenPrintCount, 1);
+    } finally { await settings.close(); }
+    console.log('PASS: grouped/takeaway print toggles, persistent metadata, disabled direct/stale previews, localized settings AR/HE/EN, notes/options and measured 80/58mm print/PDF layouts.');
   } finally { await browser.close(); }
 }
