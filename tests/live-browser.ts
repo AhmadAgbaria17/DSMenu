@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { mockRealtime, realtimeTest } from './realtime-transport';
@@ -31,7 +32,7 @@ export async function runLiveBrowserChecks(base: string, fixture: StaffFixture) 
     await expect(dashboard.getByText('Live updates connected', { exact: true })).toBeVisible();
     await dashboard.getByRole('button', { name: 'Sound notifications', exact: true }).click();
     await expect(dashboard.getByRole('button', { name: 'Sound notifications', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await menu.goto(`${base}/r/salt?table=7`);
+    await menu.goto(`${base}/r/salt?table=7`); await enterTableFixture(menu);
     await menu.getByRole('button', { name: 'English', exact: true }).click();
     await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
     await menu.getByRole('dialog').getByRole('textbox').fill('Live test: no onion');

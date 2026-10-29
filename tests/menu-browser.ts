@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import sharp from 'sharp';
@@ -36,7 +37,7 @@ export async function runMenuBrowserChecks(base: string, fixture: StaffFixture) 
     await expect.poll(async () => !!(await Product.findById(product._id))?.image?.publicId).toBe(true);
     await dashboard.screenshot({ path: 'test-artifacts/product-editor-en-tablet.png' });
     await dashboard.keyboard.press('Escape');
-    await menu.goto(`${base}/r/salt?table=2`); await menu.getByRole('button', { name: 'English', exact: true }).click();
+    await menu.goto(`${base}/r/salt?table=2`); await enterTableFixture(menu); await menu.getByRole('button', { name: 'English', exact: true }).click();
     await expect(menu.getByRole('heading', { name: 'Salads', exact: true })).toBeVisible();
     await menu.getByRole('button', { name: 'Add Caesar Salad', exact: true }).first().click();
     await menu.getByRole('dialog').getByRole('button', { name: /Add to My Order/ }).click();
@@ -48,17 +49,17 @@ export async function runMenuBrowserChecks(base: string, fixture: StaffFixture) 
     const ordered = await Order.findOne({ restaurantId: fixture.restaurantId, 'items.productId': product._id }).orFail(); assert.equal(ordered.items[0].price, 4290); assert.equal(ordered.items[0].notes, 'Dressing on the side');
     const row = dashboard.getByTestId(`managed-${product._id}`);
     await row.getByRole('button', { name: 'Available', exact: true }).click(); await expect(row.getByRole('button', { name: 'Unavailable', exact: true })).toBeVisible();
-    await menu.reload(); await expect(menu.getByRole('button', { name: 'Add Caesar Salad', exact: true }).first()).toBeDisabled();
+    await menu.reload(); await enterTableFixture(menu); await expect(menu.getByRole('button', { name: 'Add Caesar Salad', exact: true }).first()).toBeDisabled();
     await row.getByRole('button', { name: 'Edit', exact: true }).click(); await dashboard.getByLabel('Price (₪)', { exact: true }).fill('45.50');
     await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible(); await dashboard.keyboard.press('Escape');
-    await menu.reload(); await expect(menu.locator(`[data-product-id="${product._id}"]`).first()).toContainText('45.50'); assert.equal((await Order.findById(ordered._id).orFail()).items[0].price, 4290);
+    await menu.reload(); await enterTableFixture(menu); await expect(menu.locator(`[data-product-id="${product._id}"]`).first()).toContainText('45.50'); assert.equal((await Order.findById(ordered._id).orFail()).items[0].price, 4290);
     await dashboard.getByRole('link', { name: 'Restaurant Settings', exact: true }).click();
     await dashboard.getByLabel('Description', { exact: true }).fill('Fresh menu, made daily'); await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible();
     for (const title of ['Restaurant logo', 'Cover image']) {
       const section = dashboard.locator('section').filter({ has: dashboard.getByRole('heading', { name: title, exact: true }) });
       await section.getByLabel('Upload or replace image').setInputFiles({ name: 'brand.png', mimeType: 'image/png', buffer: png }); await expect(section.getByText('Saved successfully', { exact: true })).toBeVisible();
     }
-    await menu.reload(); await expect(menu.getByText('Fresh menu, made daily', { exact: true })).toBeVisible();
+    await menu.reload(); await enterTableFixture(menu); await expect(menu.getByText('Fresh menu, made daily', { exact: true })).toBeVisible();
     await dashboard.getByRole('link', { name: 'Products', exact: true }).click();
     await dashboard.getByRole('button', { name: 'العربية', exact: true }).click(); await expect(dashboard.locator('html')).toHaveAttribute('dir', 'rtl');
     await dashboard.getByTestId(`managed-${product._id}`).getByRole('button', { name: 'تعديل', exact: true }).click();

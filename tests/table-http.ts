@@ -1,3 +1,4 @@
+import { tableAccessFetch as fetch } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';

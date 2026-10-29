@@ -1,3 +1,4 @@
+import { tableAccessFetch as fetch } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { AuthClient, type StaffFixture } from './staff-http';
 import { realtimeTest } from './realtime-transport';

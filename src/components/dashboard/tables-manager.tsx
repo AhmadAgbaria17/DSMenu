@@ -8,7 +8,7 @@ import { actionClass } from './menu-fields';
 import type { TableSnapshot, ManagedTable } from '@/types/tables';
 
 export function TablesManager({ initial }: { initial: TableSnapshot }) {
-  const t = useTranslations('Tables'); const locale = useLocale();
+  const access = useTranslations('TableAccess'); const t = useTranslations('Tables'); const locale = useLocale();
   const [data, setData] = useState(initial); const [editing, setEditing] = useState<ManagedTable | 'new' | null>(null);
   const [closing, setClosing] = useState<ManagedTable | null>(null); const [pending, setPending] = useState(false);
   const [message, setMessage] = useState(''); const busy = useRef(false);
@@ -42,7 +42,7 @@ export function TablesManager({ initial }: { initial: TableSnapshot }) {
     {!editing && !closing && feedback}
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.tables.map(table => <article key={table.id} data-testid={`table-${table.tableNumber}`} className="rounded-2xl border bg-white p-5">
       <h2 className="text-2xl font-bold">{t('table', { number: table.tableNumber })}</h2><p>{table.label}</p><p className="my-3 font-bold">{t(table.state)}</p>
-      {table.visit && <div className="space-y-2 rounded-xl bg-stone-50 p-3"><p>{t('activeVisit')}: <time dateTime={table.visit.openedAt}>{new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(table.visit.openedAt))}</time></p><p>{t('orders', { count: table.visit.activeOrders })}</p><p>{t('calls', { count: table.visit.unresolvedCalls })}</p></div>}
+      {table.visit && <div className="space-y-2 rounded-xl bg-stone-50 p-3">{table.visit.accessCode && <p className="text-lg font-bold">{access('staffCode')}: <bdi data-testid="table-access-code" className="text-2xl tracking-widest">{table.visit.accessCode}</bdi></p>}<p>{t('activeVisit')}: <time dateTime={table.visit.openedAt}>{new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' }).format(new Date(table.visit.openedAt))}</time></p><p>{t('orders', { count: table.visit.activeOrders })}</p><p>{t('calls', { count: table.visit.unresolvedCalls })}</p></div>}
       <div className="mt-4 flex flex-wrap gap-2"><button className={actionClass} onClick={() => { setMessage(''); setEditing(table); }}>{t('edit')}</button>{table.isActive && <Link className={actionClass} href={`/dashboard/qr-codes#table-${table.tableNumber}`}>{t('qr')}</Link>}{table.visit && <button className={actionClass} onClick={() => { setMessage(''); setClosing(table); }}>{t('closeVisit')}</button>}</div>
     </article>)}</div>
     {!data.tables.length && <p>{t('empty')}</p>}

@@ -1,4 +1,25 @@
 {
+  "TableAccess": {
+    "createTitle": "Start Table {number}",
+    "joinTitle": "Join Table {number}",
+    "createHint": "Choose a new 3-digit code.",
+    "joinHint": "Enter the 3-digit code chosen by someone at your table.",
+    "shareHint": "Share this code only with the people sitting with you. They need it to join this table and order.",
+    "askHint": "Ask someone sitting at your table for the code.",
+    "codeLabel": "3-digit table code",
+    "create": "Start session",
+    "join": "Enter menu",
+    "loading": "Please wait…",
+    "retry": "Try again",
+    "invalid": "Enter exactly three digits, including any leading zero.",
+    "incorrect": "Incorrect table code.",
+    "limited": "Too many attempts. Try again shortly.",
+    "started": "This table session has already started. Enter the existing code.",
+    "changed": "The table session has changed or closed. Check the entry step and try again.",
+    "failed": "Unable to connect. Please try again.",
+    "waiting": "Someone already at this table needs to reopen the menu and choose a code for this visit.",
+    "staffCode": "Table Code"
+  },
   "Kitchen": {
     "settingsTitle": "Kitchen Settings",
     "enablePrinting": "Enable kitchen ticket printing",
@@ -225,6 +246,11 @@
       "CANCELLED": "Cancelled"
     },
     "errors": {
+      "TABLE_CODE_REQUIRED": "Enter the 3-digit code chosen by someone at your table.",
+      "TABLE_CODE_INCORRECT": "Incorrect table code.",
+      "TABLE_CODE_LIMIT": "Too many attempts. Try again shortly.",
+      "TABLE_SESSION_STARTED": "This table session has already started. Enter the existing code.",
+      "TABLE_SESSION_CHANGED": "The table session has changed or closed. Check the entry step and try again.",
       "INVALID_REQUEST": "Please check the quantities and notes in your selection.",
       "FORBIDDEN": "We could not verify this request. Reload the page and try again.",
       "TABLE_UNAVAILABLE": "This restaurant or table is not available. Please ask a member of staff.",

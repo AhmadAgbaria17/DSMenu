@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium, expect } from '@playwright/test';
@@ -20,7 +21,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
   const artifacts = 'test-artifacts';
   await mkdir(artifacts, { recursive: true });
   try {
-    await page.goto(`${base}/r/salt?table=7`);
+    await page.goto(`${base}/r/salt?table=7`); await enterTableFixture(page);
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.getByTestId('my-order-button')).toBeEnabled();
@@ -86,7 +87,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByTestId('my-order-button')).toBeFocused();
 
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await expect(page.getByTestId('my-order-button')).toContainText('3 items');
     await expect(page.getByTestId('my-order-button')).toContainText('144.00');
     await page.getByRole('button', { name: 'עברית', exact: true }).click();
@@ -104,13 +105,13 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await page.getByRole('button', { name: 'English', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
-    await page.goto(`${base}/r/salt?table=8`);
+    await page.goto(`${base}/r/salt?table=8`); await enterTableFixture(page);
     await expect(page.getByTestId('my-order-button')).toBeEnabled();
     await expect(page.getByTestId('my-order-button')).toContainText('0 items');
-    await page.goto(`${base}/r/other?table=99`);
+    await page.goto(`${base}/r/other?table=99`); await enterTableFixture(page);
     await expect(page.getByTestId('my-order-button')).toBeEnabled();
     await expect(page.getByTestId('my-order-button')).toContainText('0 items');
-    await page.goto(`${base}/r/salt?table=7`);
+    await page.goto(`${base}/r/salt?table=7`); await enterTableFixture(page);
     await expect(page.getByTestId('my-order-button')).toContainText('3 items');
     await page.getByTestId('my-order-button').click();
     await page.getByRole('button', { name: 'Remove Classic Burger' }).last().click();
@@ -120,18 +121,18 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     await expect(page.getByText('Your order is empty', { exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
 
-    await page.goto(`${base}/r/salt?table=99`);
+    await page.goto(`${base}/r/salt?table=99`); await enterTableFixture(page);
     await expect(page.getByRole('alert').filter({ hasText: 'This table link is invalid' })).toBeVisible();
     await expect(page.getByTestId('my-order-button')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Classic Burger', exact: true }).first()).toBeDisabled();
-    await page.goto(`${base}/r/salt`);
+    await page.goto(`${base}/r/salt`); await enterTableFixture(page);
     await page.getByRole('link', { name: 'Table 7', exact: true }).click();
     await expect(page.getByTestId('detected-table')).toContainText('Table 7');
 
     // The table label is server rendered; wait for cart hydration before replacing storage.
     await expect(page.getByTestId('my-order-button')).toBeEnabled();
     await page.evaluate(key => localStorage.setItem(key, '{not-json'), storageKey);
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await expect(page.getByText('Your saved selection was updated', { exact: false })).toBeVisible();
     await expect(page.getByTestId('my-order-button')).toContainText('0 items');
     const stale = JSON.stringify({ version: 1, ...scope, items: [
@@ -140,7 +141,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
       { productId: '000000000000000000000999', quantity: 1, note: '' },
     ] });
     await page.evaluate(({ key, value }) => localStorage.setItem(key, value), { key: storageKey, value: stale });
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await expect(page.getByTestId('my-order-button')).toContainText('99 items');
     await page.getByTestId('my-order-button').click();
     await expect(page.getByTestId('cart-line')).toHaveCount(1);
@@ -151,7 +152,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     // Genuine server catalog changes can be reconciled without trusting stored snapshots.
     const saved = serializeCart([{ productId, quantity: 1, note: '' }], scope);
     await page.evaluate(({ key, value }) => localStorage.setItem(key, value), { key: storageKey, value: saved });
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.screenshot({ path: `${artifacts}/menu-en-desktop.png`, fullPage: true });
     for (const width of [320, 390, 768, 1280]) {
@@ -167,7 +168,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     });
     const blockedPage = await blocked.newPage();
     await mockRealtime(blocked);
-    await blockedPage.goto(`${base}/r/salt?table=7`);
+    await blockedPage.goto(`${base}/r/salt?table=7`); await enterTableFixture(blockedPage);
     await blockedPage.getByRole('button', { name: 'English', exact: true }).click();
     await expect(blockedPage.getByText('Your browser cannot save this order.', { exact: false })).toBeVisible();
     await blockedPage.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
@@ -182,7 +183,7 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
     // Refresh gets current prices; a locale server rerender can remove a now-unavailable
     // item without remounting the provider. Re-enabling it must not resurrect the line.
     await changeProduct({ price: 5200 });
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await expect(page.getByTestId('my-order-button')).toContainText('52.00');
     await changeProduct({ isAvailable: false });
     await page.getByRole('button', { name: 'עברית', exact: true }).click();
@@ -198,14 +199,14 @@ export async function runBrowserChecks(base: string, restaurantId: string, produ
       contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" fill="#254b3e"/></svg>',
     }));
     await changeProduct({ image: { url: 'https://menu-images.example.test/good.svg', publicId: 'private-image-identifier' } });
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     const productImage = page.getByRole('img', { name: 'Classic Burger', exact: true }).first();
     await productImage.scrollIntoViewIfNeeded();
     await expect.poll(() => productImage.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     assert.doesNotMatch(await page.content(), /private-image-identifier/);
     await page.route('https://menu-images.example.test/broken.png', route => route.abort());
     await changeProduct({ image: { url: 'https://menu-images.example.test/broken.png', publicId: 'private-image-identifier' } });
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await page.getByRole('button', { name: 'View Classic Burger', exact: true }).first().scrollIntoViewIfNeeded();
     await expect(page.getByRole('button', { name: 'View Classic Burger', exact: true }).first().locator('img')).toHaveCount(0);
     await checkProductImageFraming(page, base, productId, changeProduct);

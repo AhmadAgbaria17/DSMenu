@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { mockRealtime } from './realtime-transport';
@@ -22,7 +23,7 @@ export async function runOrderBrowserChecks(base: string) {
     await expect(page.getByTestId('send-order')).toBeEnabled();
   }
   try {
-    await page.goto(`${base}/r/salt?table=12`);
+    await page.goto(`${base}/r/salt?table=12`); await enterTableFixture(page);
     await page.getByRole('button', { name: 'English', exact: true }).click();
     await addBurger();
     const visit = await TableSession.findOne({ tableId: table._id, status: 'ACTIVE' }).orFail();
@@ -65,7 +66,7 @@ export async function runOrderBrowserChecks(base: string) {
     await expect(page.getByTestId('cart-line')).toHaveCount(1);
     assert.equal(await Order.countDocuments(scope), 2);
     await page.unroute(endpoint);
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await page.getByTestId('my-order-button').click();
     await expect(page.getByTestId('send-order')).toHaveText('Retry this order');
     await page.getByTestId('send-order').click();
@@ -108,7 +109,7 @@ export async function runOrderBrowserChecks(base: string) {
     await expect(page.getByTestId('cart-line')).toHaveCount(1);
     assert.equal(await Order.countDocuments(scope), 3);
     assert.equal(await TableSession.countDocuments({ tableId: table._id }), 1);
-    await page.reload();
+    await page.reload(); await enterTableFixture(page);
     await page.getByTestId('my-order-button').click();
     await expect(page.getByTestId('send-order')).toBeEnabled();
     await expect(page.getByTestId('submitted-order')).toHaveCount(0);

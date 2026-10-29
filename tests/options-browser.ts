@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { Product, Order } from '../src/models';
@@ -40,7 +41,7 @@ export async function runOptionsBrowserChecks(base: string, fixture: StaffFixtur
     }
     await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible();
     await dashboard.screenshot({ path: 'test-artifacts/options-editor-tablet.png' }); await dashboard.keyboard.press('Escape');
-    await menu.goto(`${base}/r/salt?table=7`); await expect(menu.locator('html')).toHaveAttribute('dir', 'rtl');
+    await menu.goto(`${base}/r/salt?table=7`); await enterTableFixture(menu); await expect(menu.locator('html')).toHaveAttribute('dir', 'rtl');
     await menu.getByRole('button', { name: 'English', exact: true }).click(); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
     const dialog = menu.getByRole('dialog'); await expect(dialog.getByLabel('Tomato', { exact: true })).toBeChecked(); await dialog.getByLabel('Tomato', { exact: true }).uncheck();
     await dialog.getByRole('checkbox', { name: /Extra Cheese/ }).check();
@@ -48,19 +49,19 @@ export async function runOptionsBrowserChecks(base: string, fixture: StaffFixtur
     await dialog.getByRole('radio', { name: 'Spicy', exact: true }).check(); await expect(dialog.getByRole('radio', { name: 'Regular', exact: true })).not.toBeChecked();
     await dialog.getByRole('button', { name: 'Increase Classic Burger quantity' }).click(); await dialog.getByRole('textbox', { name: 'Order notes (optional)' }).fill('Options browser note');
     await expect(dialog.getByRole('button', { name: /Add to My Order/ })).toContainText('106.00'); await menu.screenshot({ path: 'test-artifacts/options-customer-en.png' });
-    await dialog.getByRole('button', { name: /Add to My Order/ }).click(); await menu.reload(); await menu.getByTestId('my-order-button').click();
+    await dialog.getByRole('button', { name: /Add to My Order/ }).click(); await menu.reload(); await enterTableFixture(menu); await menu.getByTestId('my-order-button').click();
     await expect(menu.getByTestId('cart-subtotal')).toContainText('106.00'); await expect(menu.getByTestId('cart-line')).toContainText('Without: Tomato'); await expect(menu.getByTestId('cart-line')).toContainText('Extra Cheese');
     await menu.getByTestId('send-order').click(); await expect(menu.getByTestId('order-success')).toBeVisible();
     const historical = await Order.findOne({ restaurantId: fixture.restaurantId, 'items.notes': 'Options browser note' }).orFail();
     assert.equal(historical.subtotal, 10600); await expect(menu.getByTestId('submitted-order').filter({ hasText: 'Options browser note' })).toContainText('Spicy');
-    await dashboard.goto(`${base}/dashboard/orders`); const live = dashboard.locator('article').filter({ hasText: 'Options browser note' }); await expect(live).toContainText('Without: Tomato'); await expect(live).toContainText('Extra Cheese'); await expect(live).toContainText('Spicy');
+    await dashboard.goto(`${base}/dashboard/orders`); const live = dashboard.getByRole('main').getByTestId(`staff-order-${historical._id}`); await expect(live).toBeVisible(); await expect(live).toContainText('Without: Tomato'); await expect(live).toContainText('Extra Cheese'); await expect(live).toContainText('Spicy');
     await dashboard.goto(`${base}/dashboard/products`); await dashboard.getByTestId(`managed-${product._id}`).getByRole('button', { name: 'Edit', exact: true }).click();
     await dashboard.getByTestId('option-group-editor').nth(1).getByTestId('option-editor').first().getByLabel('Extra price (₪)', { exact: true }).fill('6.00'); await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible();
     assert.equal((await Order.findById(historical._id).orFail()).items[0].price, 5300);
-    await menu.keyboard.press('Escape'); await menu.reload(); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click(); await dialog.getByRole('checkbox', { name: /Extra Cheese/ }).check(); await dialog.getByRole('button', { name: /Add to My Order/ }).click();
+    await menu.keyboard.press('Escape'); await menu.reload(); await enterTableFixture(menu); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click(); await dialog.getByRole('checkbox', { name: /Extra Cheese/ }).check(); await dialog.getByRole('button', { name: /Add to My Order/ }).click();
     // Deactivate a selected option through the real editor; persisted cart must stop submission.
     await dashboard.getByTestId('option-group-editor').nth(1).getByTestId('option-editor').first().getByLabel('Active', { exact: true }).uncheck(); await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible();
-    await menu.reload(); await menu.getByTestId('my-order-button').click(); await expect(menu.getByRole('alert').filter({ hasText: 'Options changed' })).toBeVisible(); await expect(menu.getByTestId('send-order')).toBeDisabled();
+    await menu.reload(); await enterTableFixture(menu); await menu.getByTestId('my-order-button').click(); await expect(menu.getByRole('alert').filter({ hasText: 'Options changed' })).toBeVisible(); await expect(menu.getByTestId('send-order')).toBeDisabled();
     await menu.keyboard.press('Escape');
     for (const [language, dir, tomato] of [['العربية', 'rtl', 'طماطم'], ['עברית', 'rtl', 'עגבנייה'], ['English', 'ltr', 'Tomato']]) {
       await menu.getByRole('button', { name: language, exact: true }).click(); await expect(menu.locator('html')).toHaveAttribute('dir', dir);
@@ -74,7 +75,7 @@ export async function runOptionsBrowserChecks(base: string, fixture: StaffFixtur
     await editors.nth(2).getByLabel('Sort order', { exact: true }).first().fill('0');
     for (let index = 0; index < 4; index++) await editors.nth(0).getByTestId('option-editor').nth(index).getByLabel('Sort order', { exact: true }).fill(String(index === 3 ? 0 : index + 1));
     await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible();
-    await menu.reload(); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
+    await menu.reload(); await enterTableFixture(menu); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
     assert.deepEqual(await dialog.locator('legend').allTextContents(), ['Sauce', 'Vegetables', 'Extras']);
     assert.deepEqual(await dialog.getByRole('group', { name: 'Vegetables', exact: true }).locator('label').allTextContents(), ['Onion', 'Lettuce', 'Tomato', 'Pickles']); await menu.keyboard.press('Escape');
     dashboard.once('dialog', prompt => prompt.accept()); await editors.nth(2).getByTestId('option-editor').nth(1).getByRole('button', { name: 'Remove option', exact: true }).click();
@@ -82,7 +83,7 @@ export async function runOptionsBrowserChecks(base: string, fixture: StaffFixtur
     await editors.nth(0).getByLabel('Active', { exact: true }).first().uncheck();
     dashboard.once('dialog', prompt => prompt.accept()); await editors.nth(1).getByRole('button', { name: 'Remove group', exact: true }).click();
     await dashboard.getByRole('button', { name: 'Save', exact: true }).click(); await expect(dashboard.getByText('Saved successfully', { exact: true })).toBeVisible();
-    await menu.reload(); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
+    await menu.reload(); await enterTableFixture(menu); await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
     assert.deepEqual(await dialog.locator('legend').allTextContents(), ['Sauce']); await expect(dialog.getByRole('radio', { name: 'Spicy', exact: true })).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: /Add to My Order/ })).toBeDisabled(); await dialog.getByRole('radio', { name: 'No Sauce', exact: true }).check(); await expect(dialog.getByRole('button', { name: /Add to My Order/ })).toBeEnabled(); await menu.keyboard.press('Escape');
     assert.equal((await Order.findById(historical._id).orFail()).items[0].optionGroups[1].selected[0].nameEn, 'Extra Cheese');

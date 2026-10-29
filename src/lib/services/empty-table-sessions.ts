@@ -41,6 +41,7 @@ export async function closeEmptyTableSessions(scope?: Scope) {
         // competing transaction wins, the retry rechecks dates and all blockers.
         const visit = await TableSession.findOneAndUpdate({ ...eligibility, ...candidate }, {
           $set: { status: 'CLOSED', closedAt: now, closeReason: 'AUTO_EMPTY_TIMEOUT' },
+          $unset: { accessCode: '', codeAttemptCount: '', codeAttemptWindowAt: '' },
         }, { session, returnDocument: 'after', runValidators: true }).select('_id').lean();
         if (!visit) return false;
         const childScope = { restaurantId: candidate.restaurantId, tableSessionId: candidate._id };

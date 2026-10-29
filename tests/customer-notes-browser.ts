@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { Order, Product, Table, TableSession } from '../src/models';
@@ -33,7 +34,7 @@ export async function runCustomerNotesBrowserChecks(base: string, fixture: Staff
     await toggle(products.colaId, true); await toggle(products.colaId, false);
     for (const [locale, messages] of [['ar', ar], ['he', he], ['en', en]] as const) {
       await customer.addCookies([{ name: 'dsmenu-language', value: locale, url: base }]);
-      await menu.goto(base + '/r/salt?table=209');
+      await menu.goto(base + '/r/salt?table=209'); await enterTableFixture(menu);
       await menu.locator(`[data-product-id="${products.burgerId}"]`).first().getByRole('button').first().click();
       await expect(menu.getByRole('textbox', { name: messages.Shopping.note, exact: true })).toHaveAttribute('placeholder', messages.Shopping.notePlaceholder);
       await expect(menu.locator('html')).toHaveAttribute('dir', locale === 'en' ? 'ltr' : 'rtl');
@@ -44,11 +45,11 @@ export async function runCustomerNotesBrowserChecks(base: string, fixture: Staff
       await expect(menu.getByRole('dialog').getByRole('button', { name: messages.Shopping.addToOrder, exact: false })).toBeEnabled();
       await menu.keyboard.press('Escape');
     }
-    await customer.addCookies([{ name: 'dsmenu-language', value: 'ar', url: base }]); await menu.reload();
+    await customer.addCookies([{ name: 'dsmenu-language', value: 'ar', url: base }]); await menu.reload(); await enterTableFixture(menu);
     await menu.locator(`[data-product-id="${products.burgerId}"]`).first().getByRole('button').first().click();
     await menu.getByRole('textbox', { name: ar.Shopping.note, exact: true }).fill(note);
     await menu.getByRole('dialog').getByRole('button', { name: ar.Shopping.addToOrder, exact: false }).click();
-    await menu.reload(); await menu.getByTestId('my-order-button').click();
+    await menu.reload(); await enterTableFixture(menu); await menu.getByTestId('my-order-button').click();
     await expect(menu.getByTestId('cart-line')).toContainText(note);
     await menu.getByTestId('send-order').click(); await expect(menu.getByTestId('order-success')).toBeVisible();
     const visit = await TableSession.findOne({ tableId: table._id, status: 'ACTIVE' }).orFail();
@@ -64,11 +65,11 @@ export async function runCustomerNotesBrowserChecks(base: string, fixture: Staff
     await group.getByRole('link', { name: 'Print Kitchen Ticket', exact: true }).click();
     const ticket = await popup; await expect(ticket.getByTestId('kitchen-ticket')).toContainText(note); await ticket.close();
     // Stored drafts keep their instructions visible, block sending, and allow explicit removal.
-    await customer.addCookies([{ name: 'dsmenu-language', value: 'en', url: base }]); await menu.reload();
+    await customer.addCookies([{ name: 'dsmenu-language', value: 'en', url: base }]); await menu.reload(); await enterTableFixture(menu);
     await menu.evaluate(({ restaurantId, productId, selections }) => {
       localStorage.setItem(`dsmenu-cart:v1:${restaurantId}:209`, JSON.stringify({ version: 1, restaurantId, tableNumber: 209, items: [{ productId, quantity: 1, note: 'Old instruction', selections }] }));
     }, { restaurantId: fixture.restaurantId, productId: products.burgerId, selections: originalOptions.map(g => ({ groupId: g.id, optionIds: g.options.filter(o => o.isDefault).map(o => o.id) })) });
-    await menu.reload(); await menu.getByTestId('my-order-button').click();
+    await menu.reload(); await enterTableFixture(menu); await menu.getByTestId('my-order-button').click();
     await expect(menu.getByTestId('cart-line')).toContainText('Old instruction');
     await expect(menu.getByTestId('send-order')).toBeDisabled();
     await expect(menu.getByTestId('cart-line').locator('textarea')).toHaveCount(0);

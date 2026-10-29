@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { Category, Product, Order, TakeawaySession } from '../src/models';
@@ -27,9 +28,9 @@ export async function runTakeawayBrowserChecks(base: string, fixture: StaffFixtu
     const boxes = await burgers.evaluateAll(elements => elements.slice(0, 2).map(e => ({ x: e.getBoundingClientRect().x, y: e.getBoundingClientRect().y }))); assert.equal(boxes[0].y, boxes[1].y); assert.notEqual(boxes[0].x, boxes[1].x);
     await dashboard.getByLabel('Search products', { exact: true }).fill('Classic Burger'); await expect(dashboard.getByTestId(`managed-${burger._id}`)).toBeVisible(); await expect(dashboard.getByTestId(`managed-${cola._id}`)).toHaveCount(0); await dashboard.getByLabel('Search products', { exact: true }).fill('');
     const colaCard = dashboard.getByTestId(`managed-${cola._id}`); if (!available) await colaCard.getByRole('button', { name: 'Unavailable', exact: true }).click(); await expect(colaCard.getByRole('button', { name: 'Available', exact: true })).toBeVisible(); await colaCard.getByRole('button', { name: 'Available', exact: true }).click(); await expect(colaCard.getByRole('button', { name: 'Unavailable', exact: true })).toBeVisible();
-    await menu.goto(`${base}/r/salt?table=7`); await menu.getByRole('button', { name: 'English', exact: true }).click(); await expect(menu.getByRole('button', { name: 'Add Cola', exact: true }).first()).toBeDisabled();
+    await menu.goto(`${base}/r/salt?table=7`); await enterTableFixture(menu); await menu.getByRole('button', { name: 'English', exact: true }).click(); await expect(menu.getByRole('button', { name: 'Add Cola', exact: true }).first()).toBeDisabled();
     await colaCard.getByRole('button', { name: 'Unavailable', exact: true }).click(); await expect(colaCard.getByRole('button', { name: 'Available', exact: true })).toBeVisible();
-    await menu.reload(); await menu.getByRole('button', { name: 'Add Cola', exact: true }).first().click(); await menu.getByRole('dialog').getByRole('button', { name: /Add to My Order/ }).click();
+    await menu.reload(); await enterTableFixture(menu); await menu.getByRole('button', { name: 'Add Cola', exact: true }).first().click(); await menu.getByRole('dialog').getByRole('button', { name: /Add to My Order/ }).click();
     await dashboard.getByTestId(`managed-${burger._id}`).getByRole('button', { name: 'Edit', exact: true }).click(); await expect(dashboard.getByTestId('options-entry')).toBeInViewport(); await expect(dashboard.getByTestId('option-group-editor')).toHaveCount(3); await dashboard.keyboard.press('Escape');
     for (const [locale, messages] of [['ar', ar], ['he', he]] as const) {
       await staff.addCookies([{ name: 'dsmenu-language', value: locale, url: base }]); await dashboard.reload(); await expect(dashboard.locator('html')).toHaveAttribute('dir', 'rtl'); await expect(dashboard.getByLabel(messages.ProductGrid.search, { exact: true })).toBeVisible();

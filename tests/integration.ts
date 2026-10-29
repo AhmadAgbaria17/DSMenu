@@ -39,7 +39,7 @@ async function main() {
     const session = await models.TableSession.create({ restaurantId: salt._id, tableId: table._id });
     await assert.rejects(models.TableSession.create({ restaurantId: salt._id, tableId: table._id }), { code: 11000 });
     await models.TableSession.updateOne({ _id: session._id }, { $set: { status: 'CLOSED', closedAt: new Date() } });
-    const nextSession = await models.TableSession.create({ restaurantId: salt._id, tableId: table._id });
+    const nextSession = await models.TableSession.create({ restaurantId: salt._id, tableId: table._id, accessCode: '027' });
     const call = await models.ServiceCall.create({ restaurantId: salt._id, tableId: table._id, tableSessionId: nextSession._id, type: 'WAITER' });
     await assert.rejects(models.ServiceCall.create({ restaurantId: salt._id, tableId: table._id, tableSessionId: nextSession._id, type: 'WAITER' }), { code: 11000 });
     await models.ServiceCall.updateOne({ _id: call._id }, { $set: { status: 'RESOLVED' } });
@@ -99,7 +99,8 @@ async function main() {
     assert.doesNotMatch(english.html, /TenantSecret|CrossTenantReference|passwordHash/);
     assert.match(english.html, /A few house favorites/);
     assert.match(english.html, /Find your next favorite/);
-    assert.match(english.html, /data-testid="my-order-button"/);
+    assert.doesNotMatch(english.html, /data-testid="my-order-button"/, 'table menu is gated before verification');
+    assert.match((await page('/r/salt', 'en')).html, /data-product-id=/, 'public browsing remains available');
     assert.doesNotMatch(english.html, /publicId/);
     assert.match((await page('/r/salt?table=7', 'he')).html, /lang="he" dir="rtl"/);
     assert.match((await page('/r/salt?table=7', 'invalid')).html, /lang="ar" dir="rtl"/);
@@ -117,7 +118,7 @@ async function main() {
       await runBrowserChecks(base, String(salt._id), String(burger._id), String(unavailable._id), async patch => {
         await models.Product.updateOne({ restaurantId: salt._id, _id: burger._id }, { $set: patch }, { runValidators: true });
       });
-      // Phase 3 intentionally establishes visits on entry. Browsing still must not
+      // Explicit fixture code entry establishes visits. Browsing still must not
       // create orders or service calls; table 7 is reused and only tables 8/99 are new.
       assert.deepEqual(await Promise.all([models.Order.countDocuments(), models.ServiceCall.countDocuments()]), [counts[0], counts[2]], 'browsing never submits orders or service calls');
       assert.equal(await models.TableSession.countDocuments(), counts[1] + 2, 'only newly visited tables create sessions');
@@ -128,6 +129,11 @@ async function main() {
     await runOrderHttpChecks(base);
     const { runStaffHttpChecks } = await import('./staff-http');
     const staffFixture = await runStaffHttpChecks(base);
+    if (process.argv.includes('--table-access-only')) {
+      const { runTableAccessChecks } = await import('./table-access-http'); await runTableAccessChecks(base, staffFixture);
+      const { runTableAccessBrowserChecks } = await import('./table-access-browser'); await runTableAccessBrowserChecks(base, staffFixture);
+      return;
+    }
     if (process.argv.includes('--browser')) {
       const { runStaffBrowserChecks } = await import('./staff-browser');
       await runStaffBrowserChecks(base, staffFixture);
@@ -179,6 +185,9 @@ async function main() {
     if (process.argv.includes('--browser')) { const { runCustomerNotesBrowserChecks } = await import('./customer-notes-browser'); await runCustomerNotesBrowserChecks(base, staffFixture, notesFixture); }
     const { runEmptyTableSessionChecks } = await import('./empty-table-sessions-http');
     await runEmptyTableSessionChecks(base, staffFixture);
+    const { runTableAccessChecks } = await import('./table-access-http');
+    await runTableAccessChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runTableAccessBrowserChecks } = await import('./table-access-browser'); await runTableAccessBrowserChecks(base, staffFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

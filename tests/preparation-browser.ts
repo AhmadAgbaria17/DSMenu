@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect, type Page } from '@playwright/test';
 import { Order, Table, TableSession, Product, KitchenPrintState } from '../src/models';
@@ -23,7 +24,7 @@ export async function runPreparationBrowserChecks(base: string, fixture: StaffFi
     await dashboard.getByLabel('Email', { exact: true }).fill('preparation@salt.local'); await dashboard.getByLabel('Password', { exact: true }).fill(fixture.password); await dashboard.getByRole('button', { name: 'Log in', exact: true }).click(); await expect(dashboard).toHaveURL(base + '/dashboard');
     await dashboard.goto(base + '/dashboard/orders');
     await expect(dashboard.getByText('Live updates connected', { exact: true })).toBeVisible();
-    for (const page of [a, b]) { await page.goto(base + '/r/salt?table=7'); await page.getByRole('button', { name: 'English', exact: true }).click(); }
+    for (const page of [a, b]) { await page.goto(base + '/r/salt?table=7'); await enterTableFixture(page); await page.getByRole('button', { name: 'English', exact: true }).click(); }
     const table = await Table.findOne({ restaurantId: fixture.restaurantId, tableNumber: 7 }).orFail();
     const visit = await TableSession.findOne({ tableId: table._id, status: 'ACTIVE' }).orFail();
     assert.equal(await Order.countDocuments({ tableSessionId: visit._id }), 0, 'fresh visit after final-bill scenario');

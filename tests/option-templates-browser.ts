@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { Product, ProductOptionTemplate } from '../src/models';
@@ -67,7 +68,7 @@ export async function runTemplateBrowserChecks(base: string, fixture: StaffFixtu
       for (const width of [320, 768, 1280]) { await page.setViewportSize({ width, height: 900 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); }
       await page.screenshot({ path: 'test-artifacts/option-templates-' + locale + '.png', fullPage: true });
     }
-    await menu.goto(base + '/r/salt?table=7'); await menu.getByRole('button', { name: 'English', exact: true }).click();
+    await menu.goto(base + '/r/salt?table=7'); await enterTableFixture(menu); await menu.getByRole('button', { name: 'English', exact: true }).click();
     await menu.getByRole('button', { name: 'Add Double Burger', exact: true }).first().click();
     await expect(menu.getByRole('checkbox', { name: 'Lettuce', exact: true })).toBeChecked();
     await expect(menu.getByRole('checkbox', { name: 'Pickles', exact: true })).toHaveCount(0);

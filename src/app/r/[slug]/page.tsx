@@ -1,3 +1,4 @@
+import { TableAccessEntry } from '@/components/menu/table-access-entry';
 import { TakeawayEntry } from '@/components/menu/takeaway-entry';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -26,7 +27,7 @@ export default async function RestaurantPage({ params, searchParams }: {
         <h2 id="choose-table" className="text-xl font-bold">{t('chooseTable')}</h2><p className="mt-2 text-stone-600">{tables.length ? t('chooseHint') : t('noTables')}</p>
         <div className="mt-4 flex flex-wrap gap-2">{tables.map(item => <Link key={item.id} href={`/r/${restaurant.slug}?table=${item.tableNumber}`} className="inline-flex min-h-12 items-center rounded-xl border border-stone-200 px-4 hover:bg-stone-100">{t('table', { number: item.tableNumber })}</Link>)}</div>
       </section>}
-    {takeaway ? <TakeawayEntry restaurant={restaurant} table={null} categories={categories} products={products} /> : <MenuBrowser key={`${restaurant.id}:${table?.tableNumber ?? 'none'}`} restaurant={restaurant} table={table} categories={categories} products={products} />}
+    {takeaway ? <TakeawayEntry restaurant={restaurant} table={null} categories={categories} products={products} /> : table ? <TableAccessEntry key={`${restaurant.id}:${table.tableNumber}`} restaurant={restaurant} table={table} categories={categories} products={products} /> : <MenuBrowser key={`${restaurant.id}:none`} restaurant={restaurant} table={table} categories={categories} products={products} />}
     <footer className="mt-12 border-t border-stone-200 pt-7 text-center text-sm text-stone-500"><p>{t('allergens')}</p><p className="mt-4" dir="ltr">DSMenu · <bdi>{restaurant.name}</bdi></p></footer>
   </main>;
 }

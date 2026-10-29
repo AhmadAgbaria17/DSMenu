@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
@@ -17,7 +18,7 @@ export async function checkProductImageFraming(page: Page, base: string, product
     await changeProduct({ image: { url, publicId: 'test-framing' } });
     for (const locale of ['ar', 'he', 'en']) {
       await page.context().addCookies([{ name: 'dsmenu-language', value: locale, url: base }]);
-      await page.goto(base + '/r/salt?table=7');
+      await page.goto(base + '/r/salt?table=7'); await enterTableFixture(page);
       await expect(page.locator('html')).toHaveAttribute('dir', locale === 'en' ? 'ltr' : 'rtl');
       for (const width of [390, 768, 1280]) {
         await page.setViewportSize({ width, height: 900 });

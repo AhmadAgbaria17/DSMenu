@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
@@ -28,7 +29,7 @@ export async function runBillBrowserChecks(base: string, fixture: StaffFixture) 
   try {
     await page.goto(base + '/login'); await page.getByRole('button', { name: 'English', exact: true }).click(); await page.getByLabel('Email', { exact: true }).fill('bill@salt.local'); await page.getByLabel('Password', { exact: true }).fill(fixture.password); await page.getByRole('button', { name: 'Log in', exact: true }).click(); await expect(page).toHaveURL(base + '/dashboard');
     if (previousVisit) assert.equal((await staff.request.post(base + '/api/dashboard/tables/' + table._id + '/close', { headers: { Origin: base }, data: { sessionId: String(previousVisit._id) } })).status(), 200);
-    await menu.goto(base + '/r/salt?table=7'); await menu.getByRole('button', { name: 'English', exact: true }).click();
+    await menu.goto(base + '/r/salt?table=7'); await enterTableFixture(menu); await menu.getByRole('button', { name: 'English', exact: true }).click();
     await menu.getByRole('button', { name: 'Add Classic Burger', exact: true }).first().click();
     await menu.getByRole('dialog').getByRole('button', { name: 'Increase Classic Burger quantity' }).click();
     await menu.getByRole('checkbox', { name: 'Tomato', exact: true }).uncheck();

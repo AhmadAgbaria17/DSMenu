@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { mockRealtime, realtimeTest } from './realtime-transport';
@@ -27,7 +28,7 @@ export async function runServiceBrowserChecks(base: string, fixture: StaffFixtur
     await dashboard.getByRole('link', { name: 'Service Calls', exact: true }).click();
     await expect(dashboard.getByText('Live updates connected', { exact: true })).toBeVisible();
     await dashboard.getByRole('button', { name: 'Sound notifications', exact: true }).click();
-    await menu.goto(`${base}/r/salt?table=4`);
+    await menu.goto(`${base}/r/salt?table=4`); await enterTableFixture(menu);
     await menu.getByRole('button', { name: 'English', exact: true }).click();
     await menu.getByRole('button', { name: 'Service', exact: true }).click();
     await menu.getByRole('button', { name: 'Call Waiter', exact: true }).click();

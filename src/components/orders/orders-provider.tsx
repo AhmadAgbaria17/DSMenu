@@ -62,8 +62,9 @@ export function OrdersProvider({ slug, restaurantId, tableNumber, takeawayVisitI
     const operation = async () => {
       setConnecting(true);
       try {
-        // Establish only on entry or explicit retry, never as part of Send Order.
-        const visit = await callApi<{ visitId: string }>(`${path}/session`, takeawayVisitId ? undefined : {});
+        // Read authorized entry state; creating/joining happens only in the gate.
+        const visit = await callApi<{ visitId?: string; mode?: string }>(`${path}/session`);
+        if (!visit.visitId || (!takeawayVisitId && visit.mode !== 'AUTHORIZED')) throw new ApiFailure({ code: 'SESSION_REQUIRED' }, false);
         const history = await callApi<OrdersResponse>(`${path}/orders`);
         if (takeawayVisitId && visit.visitId !== takeawayVisitId) throw new ApiFailure({ code: 'VISIT_CHANGED' }, false);
         if (visit.visitId !== history.visitId) throw new ApiFailure({ code: 'SESSION_CLOSED' }, false);

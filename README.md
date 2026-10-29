@@ -2,7 +2,7 @@
 
 Phases 1–9 of a multi-tenant restaurant menu and table ordering SaaS. Next.js App Router, strict TypeScript, Tailwind CSS, MongoDB/Mongoose, next-intl, Auth.js, Pusher Channels and Cloudinary.
 
-Implemented: database models, seed data, localized menu, table QR recognition, persistent carts, secure visits, order submission/history, staff authentication, live orders, service requests, private realtime updates, category/product management, restaurant settings and validated image uploads. Table lifecycle management and downloadable/printable QR cards are implemented in Phase 8. Phase 9 adds operational analytics. Payments and advanced business-intelligence features remain deferred. Entering a valid table establishes a visit; only Send Order creates an order.
+Implemented: database models, seed data, localized menu, table QR recognition, persistent carts, secure visits, order submission/history, staff authentication, live orders, service requests, private realtime updates, category/product management, restaurant settings and validated image uploads. Table lifecycle management and downloadable/printable QR cards are implemented in Phase 8. Phase 9 adds operational analytics. Payments and advanced business-intelligence features remain deferred. Entering a valid table opens the access-code gate; explicitly creating/joining a code establishes access to the visit. Only Send Order creates an order.
 
 ## Production Launch Checklist
 
@@ -127,9 +127,9 @@ Production automatically disables Mongoose index creation. Run `npm run db:index
 
 ## Phase 3: visits and orders
 
-`POST /api/r/[slug]/tables/[table]/session` accepts an empty JSON object. It validates an active restaurant/table, reuses a valid credential without an activity write, or creates/joins the single active visit. Duplicate-key races fetch the winning visit. Each browser gets an independent random 256-bit token. MongoDB stores only its SHA-256 digest and expiry in a hidden `credentials` array. The cookie is named `dsmenu-visit-<restaurantId>-<tableNumber>`, scoped to that table's API path, HttpOnly, SameSite=Lax, Secure in production, and expires after 12 hours. It is never placed in localStorage or JSON responses. Expiry removes credential access, not historical visits; no TTL is used.
+`GET /api/r/[slug]/tables/[table]/session` returns CREATE, JOIN or authorized entry state without exposing the code. `POST` accepts a validated CREATE code or JOIN code plus current session ID. An empty JSON object only resumes an already-valid credential; it cannot create or join. Concurrent creators produce one winner; the loser receives 409 and switches to JOIN. Legacy authorized devices can use SETUP for their existing code-less visit. See [Table Access](docs/TABLE-ACCESS.md) for throttling and rollout behavior. Each browser gets an independent random 256-bit token. MongoDB stores only its SHA-256 digest and expiry in a hidden `credentials` array. The cookie is named `dsmenu-visit-<restaurantId>-<tableNumber>`, scoped to that table's API path, HttpOnly, SameSite=Lax, Secure in production, and expires after 12 hours. It is never placed in localStorage or JSON responses. Expiry removes credential access, not historical visits; no TTL is used.
 
-`GET /api/r/[slug]/tables/[table]/orders` resolves the active visit from that credential. It returns only explicit DTOs for that restaurant/table/visit, with string IDs/dates and translated snapshot names. It does not accept a session ID query parameter. Browsers sharing a table's active visit see the same orders. Closed or expired credentials cannot read or submit orders. Reloading the menu can explicitly establish a new visit; sending an order never silently establishes one.
+`GET /api/r/[slug]/tables/[table]/orders` resolves the active visit from that credential. It returns only explicit DTOs for that restaurant/table/visit, with string IDs/dates and translated snapshot names. It does not accept a session ID query parameter. Browsers sharing a table's active visit see the same orders. Closed or expired credentials cannot read or submit orders. After closure, reloading shows the CREATE screen and the customer must explicitly choose a code for the new visit; sending an order never silently establishes one.
 
 `POST` to the same orders endpoint accepts `{ clientRequestId, items: [{ productId, quantity, note }] }`. Zod strips untrusted prices, names and tenant/session identifiers. Within a short transaction, the service rechecks the active credential, checks idempotency, loads tenant-owned available/non-archived products and active tenant-owned categories, and calculates integer agorot totals. Rejection is all-or-nothing and identifies affected product IDs. Price changes are accepted at the database price; the UI explains this before sending and displays the confirmed total afterward. Product names in all three languages, unit price (`price` in the existing model), quantity, notes, item totals and currency are snapshotted.
 
@@ -166,7 +166,7 @@ Set `MONGODB_URI=mongodb://127.0.0.1:27017/dsmenu?replicaSet=rs0` in `.env.local
 4. Inspect browser cookies: the table cookie is HttpOnly and scoped to its API path. LocalStorage contains only the cart, confirmation receipt and any pending submission journal. MongoDB credentials contain hashes, not cookie values.
 5. To simulate future staff changes, use your development database UI to change that Order's status to `PREPARING`, then press Refresh status. No customer endpoint can change status.
 6. Put an item in the cart, change that Product's `isAvailable` to false in the development database, then send without reloading: the request fails, the item is marked, and no partial order is stored. Restore availability afterward.
-7. Mark this development TableSession `CLOSED` with `closedAt` set. Sending from the already-open page fails and preserves the cart. Reload establishes a new active visit; the closed session/orders remain stored.
+7. Mark this development TableSession `CLOSED` with `closedAt` set. Sending from the already-open page fails and preserves the cart. Reload shows CREATE; choose a new code to start a new active visit. The closed session/orders remain stored.
 
 `tests/orders.test.ts` adds validation, credential hashing, fingerprint, durable retry journal and confirmed-cart reducer tests. `tests/order-http.ts` covers credential/tenant isolation, concurrent creation/submission, price forgery, all-or-nothing validation, idempotency, snapshots, expiry/closure and rollback after an actual insert failure. `tests/order-browser.ts` covers real submission, delayed confirmation, lost response after commit followed by reload/retry, manual status refresh, failed cart retention and RTL. Previous Phase 1/2 tests remain; their browsing assertion now expects visits for newly opened tables while still forbidding automatic orders/service calls.
 
@@ -530,7 +530,7 @@ An ACTIVE visit blocks deactivation. Close Session requires the exact current se
 
 An additive, internal `Table.lifecycleVersion` field provides a shared write lock between visit creation, deactivation and closure. Existing tables need no backfill: `$inc` creates the field when first used. Closing also writes the same TableSession that order/service creation writes. MongoDB transaction conflict retries therefore serialize these operations; no read-check-write gap can strand an active visit on an inactive table or close a visit around a newly committed request. Replica-set MongoDB is required. No new indexes are needed; keep running `npm run db:indexes` during deployment for the existing unique/partial constraints.
 
-Old closed-visit credentials cannot submit orders/services. Opening the QR again can establish a new visit under the existing anonymous entry policy. A QR is an entry point, not proof of physical presence.
+Old closed-visit credentials cannot submit orders/services. Opening the QR again shows CREATE when no active visit exists; the first customer must choose a code for the new visit. Joining an existing visit requires its current code. A QR is an entry point, not proof of physical presence.
 
 ### QR and printing
 
@@ -707,3 +707,7 @@ Tables → Close Session opens a snapshot-based bill before confirmation. Active
 ## Kitchen thermal tickets
 
 PREPARING orders/batches support optional kitchen tickets, shared Printed/Reprint counts, and AR/HE/EN 80mm/58mm layouts. Run `npm run db:indexes` before production use. See [printing workflow and printer setup](docs/KITCHEN-PRINTING.md). Browser print initiation is tracked; physical output is not confirmed.
+
+## Table access codes
+
+Table QR visits now require creating or entering a session-scoped three-digit code. Closing the visit invalidates it; the next visit chooses its own code. See [security, rollout and reset verification](docs/TABLE-ACCESS.md).

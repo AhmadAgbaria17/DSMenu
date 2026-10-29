@@ -1,3 +1,4 @@
+import { enterTableFixture } from './table-access-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
@@ -30,7 +31,7 @@ export async function runTableBrowserChecks(base: string, fixture: StaffFixture)
     await expect(print.locator('.qr-print-card')).toContainText('Table 16'); await expect(print.locator('img[src^="https://res.cloudinary.com"]')).toHaveCount(0); await print.emulateMedia({ media: 'print' }); await print.locator('.qr-print-card').screenshot({ path: 'test-artifacts/table-16-print.png' }); const singlePdf = await print.pdf({ path: 'test-artifacts/table-16-card.pdf', preferCSSPageSize: true }); assert.equal((singlePdf.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).length, 1); await print.close();
     const bulkPage = page.waitForEvent('popup'); await page.getByRole('link', { name: 'Print All Active Tables', exact: true }).click(); const bulk = await bulkPage; await bulk.waitForLoadState('load');
     const activeCount = await Table.countDocuments({ restaurantId: fixture.restaurantId, isActive: true }); await expect(bulk.locator('.qr-print-card')).toHaveCount(activeCount); await bulk.emulateMedia({ media: 'print' }); await expect(bulk.locator('.qr-print-card').first()).toBeVisible(); await expect(bulk.locator('.qr-print-card').first()).toHaveCSS('break-after', 'page'); const bulkPdf = await bulk.pdf({ path: 'test-artifacts/all-table-cards.pdf', preferCSSPageSize: true }); assert.equal((bulkPdf.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).length, activeCount); await bulk.close();
-    await menu.goto(`${base}/r/salt?table=16`); await menu.getByRole('button', { name: 'English', exact: true }).click();
+    await menu.goto(`${base}/r/salt?table=16`); await enterTableFixture(menu); await menu.getByRole('button', { name: 'English', exact: true }).click();
     const table = await Table.findOne({ restaurantId: fixture.restaurantId, tableNumber: 16 }).orFail();
     await expect.poll(() => TableSession.countDocuments({ tableId: table._id, status: 'ACTIVE' })).toBe(1);
     await page.goto(`${base}/dashboard/tables`); await expect(row).toContainText('Occupied');
@@ -41,7 +42,7 @@ export async function runTableBrowserChecks(base: string, fixture: StaffFixture)
     const cancelled = await staff.request.patch(`${base}/api/dashboard/orders/${order._id}`, { headers: { Origin: base }, data: { expectedStatus: 'NEW', status: 'CANCELLED' } }); assert.equal(cancelled.status(), 200);
     await row.getByRole('button', { name: 'Close Session', exact: true }).click(); await expect(page.getByTestId('bill-total')).toContainText('0.00'); await expect(page.getByTestId('bill-close')).toBeEnabled(); await page.getByTestId('bill-close').click(); await expect(row).toContainText('Available');
     const old = await customer.request.post(`${base}/api/r/salt/tables/16/orders`, { headers: { Origin: base }, data: { clientRequestId: randomUUID(), items: [{ productId: String(order.items[0].productId), quantity: 1, note: '' }] } }); assert.equal(old.status(), 409);
-    await menu.reload(); await expect.poll(() => TableSession.countDocuments({ tableId: table._id, status: 'ACTIVE', _id: { $ne: visit._id } })).toBe(1);
+    await menu.reload(); await enterTableFixture(menu); await expect.poll(() => TableSession.countDocuments({ tableId: table._id, status: 'ACTIVE', _id: { $ne: visit._id } })).toBe(1);
     for (const width of [390, 768, 1280]) { await page.setViewportSize({ width, height: 900 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); }
     await page.getByRole('button', { name: 'العربية', exact: true }).click(); await expect(page.locator('html')).toHaveAttribute('dir', 'rtl'); await expect(page.getByRole('heading', { name: 'الطاولات', exact: true })).toBeVisible(); await page.screenshot({ path: 'test-artifacts/tables-ar.png' });
     await page.getByRole('button', { name: 'עברית', exact: true }).click(); await expect(page.getByRole('heading', { name: 'שולחנות', exact: true })).toBeVisible();
