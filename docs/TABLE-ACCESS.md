@@ -1,24 +1,28 @@
 # Table access codes
 
-Table QR URLs remain `/r/salt?table=7`. The customer sees either **Start Table 7 / Choose a new 3-digit code** or **Join Table 7 / Enter the existing code** before the table menu. Arabic, Hebrew and English are supported. Codes are exactly three ASCII digits; `027` is valid. Public browsing without a table and takeaway keep their existing entry flows.
+Table QR URLs remain `/r/salt?table=7`. For protected visits, the customer sees either **Start Table 7 / Choose a new 3-digit code** or **Join Table 7 / Enter the existing code** before the table menu. Arabic, Hebrew and English are supported. Codes are exactly three ASCII digits; `027` is valid. Public browsing without a table and takeaway keep their existing entry flows.
+
+Restaurant Settings can now disable the gate for **new** visits. Active visits keep their own mode. See [the setting and session-snapshot rules](TABLE-ACCESS-SETTINGS.md).
 
 ## Session lifetime and security
 
 - `TableSession.accessCode` is a string, excluded from normal Mongoose projections. It is never stored on Table. Authorized staff see it in Dashboard → Tables for the active visit only.
 - The code is protected session data stored in readable form because staff must retrieve it. It is a low-entropy shared entry gate, not a replacement for authentication. The existing random 256-bit credential is issued only after successful create/join, stored hashed in MongoDB and delivered in the scoped HttpOnly/SameSite cookie (Secure in production).
-- GET `/api/r/{slug}/tables/{number}/session` returns entry mode and, where needed, the current session ID; never the code. POST accepts strict CREATE/JOIN/SETUP inputs. JOIN includes the session ID displayed by GET, preventing an old form from silently joining a later visit. An empty POST only resumes an already valid credential.
+- GET `/api/r/{slug}/tables/{number}/session` returns entry mode and, where needed, the current session ID; never the code. POST accepts strict CREATE/JOIN/SETUP inputs for protected visits and OPEN for explicitly unprotected visits. JOIN includes the session ID displayed by GET, preventing an old form from silently joining a later visit. An empty POST only resumes an already valid credential.
 - Five incorrect guesses trigger a temporary five-minute window measured from the first failed attempt. Counters commit transactionally in MongoDB, surviving app restarts and multiple instances. Already-authorized devices remain usable during cooldown. The temporary limit is shared by the visit, so one device's failures can temporarily delay other new joiners.
 - Creation uses the existing table lifecycle transaction and partial unique active-session index. A concurrent losing CREATE gets 409 and the UI switches to JOIN; no credential is issued to the loser.
-- Manual closure and empty-session cleanup atomically remove the code and counters while marking CLOSED. All existing customer authorization still requires ACTIVE. Old credentials, old session IDs and the old code cannot authorize the next visit. The next customer must explicitly choose a code. Codes are never copied from previous visits, and historical orders are retained.
+- Manual closure and empty-session cleanup atomically remove the code and counters while marking CLOSED. All existing customer authorization still requires ACTIVE. Old credentials, old session IDs and the old code cannot authorize the next visit. The next protected visit requires the customer to explicitly choose a code. Codes are never copied from previous visits, and historical orders are retained.
 - Codes do not enter URLs, QR codes, customer DTOs, realtime events, analytics, localStorage or logs. Only tenant-authorized table management returns them. Session IDs alone are not credentials.
 
 ## Existing visits at deployment
 
-A code-less ACTIVE visit is not assigned a default or automatically claimed. An already-authorized browser is prompted to choose its initial code (SETUP). Unverified visitors are asked to have someone already at the table reopen the menu to set it. Existing valid device credentials continue to authorize existing operations. A visit with no remaining authorized device can be closed by staff through the usual workflow, after completing orders/resolving calls. Its next visit starts normally.
+A legacy code-less protected ACTIVE visit is not assigned a default or automatically claimed. An already-authorized browser is prompted to choose its initial code (SETUP). Unverified visitors are asked to have someone already at the table reopen the menu to set it. Existing valid device credentials continue to authorize existing operations. A visit with no remaining authorized device can be closed by staff through the usual workflow, after completing orders/resolving calls. Its next visit starts normally.
 
 No new dependency, secret, permanent table PIN, optional staff reset action or data migration is introduced. Keep the existing unique active-session index deployed via `npm run db:indexes`.
 
 ## Reset verification
+
+Keep the restaurant access-code setting ON for this protected-session scenario.
 
 1. Open an available Table 7 on device A and create `527`.
 2. Device B must see JOIN; enter `527` and confirm it joins the same visit.

@@ -13,7 +13,7 @@ export const tableAccessFetch: typeof fetch = async (input, init) => {
     if (!response.ok) return fetch(input, init);
     const state = await response.json() as TableAccessState;
     if (state.mode === 'AUTHORIZED' || state.mode === 'WAIT') return fetch(input, init);
-    const result = await fetch(input, { ...init, body: JSON.stringify({ action: state.mode, code: fixtureTableCode, ...('sessionId' in state ? { sessionId: state.sessionId } : {}) }) });
+    const result = await fetch(input, { ...init, body: JSON.stringify({ action: state.mode, ...(state.mode === 'OPEN' ? {} : { code: fixtureTableCode }), ...('sessionId' in state ? { sessionId: state.sessionId } : {}) }) });
     if (result.status !== 409) return result;
   }
   throw new Error('Table fixture could not join the current visit');
@@ -29,6 +29,7 @@ export async function enterTableFixture(page: Page) {
   if (!response.ok()) return; // Existing invalid-table tests keep their assertions.
   const state = await response.json() as TableAccessState;
   if (state.mode === 'AUTHORIZED') return;
+  if (state.mode === 'OPEN') { await expect(page.getByTestId('my-order-button')).toBeEnabled(); return; }
   await expect(page.getByTestId('table-access-gate')).toBeVisible();
   await page.getByTestId('table-code-input').fill(fixtureTableCode);
   await page.getByTestId('table-code-submit').click();

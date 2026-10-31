@@ -19,7 +19,7 @@ export async function getManagedTables(): Promise<TableSnapshot> {
   const [restaurant, tables, visits, orders, calls] = await Promise.all([
     Restaurant.findById(staff.restaurantId).select('name slug logo').lean().orFail(),
     Table.find(scope).sort({ tableNumber: 1 }).lean(),
-    TableSession.find({ ...scope, status: 'ACTIVE' }).select('_id tableId createdAt +accessCode').lean(),
+    TableSession.find({ ...scope, status: 'ACTIVE' }).select('_id tableId createdAt accessCodeRequired +accessCode').lean(),
     Order.find({ ...scope, status: { $in: unfinishedOrderStatuses } }).select('tableSessionId').lean(),
     ServiceCall.find({ ...scope, status: { $in: ['PENDING', 'ACKNOWLEDGED'] } }).select('tableSessionId').lean(),
   ]);
@@ -32,7 +32,7 @@ export async function getManagedTables(): Promise<TableSnapshot> {
   const byTable = new Map(visits.map(v => [String(v.tableId), v]));
   return { restaurant: { name: restaurant.name, slug: restaurant.slug, logo: restaurant.logo?.url ?? null }, tables: tables.map(table => {
     const visit = byTable.get(String(table._id)); const id = visit ? String(visit._id) : '';
-    return { id: String(table._id), tableNumber: table.tableNumber, label: table.label ?? '', isActive: table.isActive, state: tableState(table.isActive, !!visit), qrUrl: tableQrUrl(appOrigin(), restaurant.slug, table.tableNumber), visit: visit ? { id, accessCode: visit.accessCode ?? null, openedAt: visit.createdAt.toISOString(), activeOrders: orderCounts.get(id) ?? 0, unresolvedCalls: callCounts.get(id) ?? 0 } : null };
+    return { id: String(table._id), tableNumber: table.tableNumber, label: table.label ?? '', isActive: table.isActive, state: tableState(table.isActive, !!visit), qrUrl: tableQrUrl(appOrigin(), restaurant.slug, table.tableNumber), visit: visit ? { id, accessCode: visit.accessCodeRequired !== false ? visit.accessCode ?? null : null, openedAt: visit.createdAt.toISOString(), activeOrders: orderCounts.get(id) ?? 0, unresolvedCalls: callCounts.get(id) ?? 0 } : null };
   }) };
 }
 export async function createTable(payload: unknown) {

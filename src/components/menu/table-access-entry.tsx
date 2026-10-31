@@ -6,6 +6,27 @@ import { tableAccessCode, type TableAccessState } from '@/lib/table-access';
 import { MenuBrowser, type MenuBrowserProps } from './menu-browser';
 import type { PublicTable } from '@/types/menu';
 
+async function readEntry(path: string, signal: AbortSignal): Promise<TableAccessState> {
+  const response = await fetch(path, { cache: 'no-store', signal });
+  if (!response.ok) throw new Error('Unavailable');
+  const state = await response.json() as TableAccessState;
+  if (state.mode !== 'OPEN') return state;
+  const joined = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'OPEN', sessionId: state.sessionId }), signal });
+  if (joined.ok) {
+    const result = await joined.json() as { visitId: string };
+    return { mode: 'AUTHORIZED', visitId: result.visitId };
+  }
+  // Reconcile a policy/session change without trusting stale browser state.
+  if (joined.status === 403 || joined.status === 409) {
+    const fresh = await fetch(path, { cache: 'no-store', signal });
+    if (fresh.ok) {
+      const next = await fresh.json() as TableAccessState;
+      if (next.mode !== 'OPEN') return next;
+    }
+  }
+  throw new Error('Unavailable');
+}
+
 export function TableAccessEntry(props: Omit<MenuBrowserProps, 'table'> & { table: PublicTable }) {
   const t = useTranslations('TableAccess');
   const [state, setState] = useState<TableAccessState | null>(null);
@@ -16,15 +37,13 @@ export function TableAccessEntry(props: Omit<MenuBrowserProps, 'table'> & { tabl
   const path = `${customerApiPath(props.restaurant.slug, props.table.tableNumber)}/session`;
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(path, { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) }).then(async response => {
-      if (!response.ok) throw new Error();
-      setState(await response.json() as TableAccessState);
-    }).catch(() => { if (!controller.signal.aborted) setError('failed'); });
+    void readEntry(path, AbortSignal.any([controller.signal, AbortSignal.timeout(20000)])).then(setState)
+      .catch(() => { if (!controller.signal.aborted) setError('failed'); });
     return () => controller.abort();
   }, [path]);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!state || state.mode === 'AUTHORIZED' || state.mode === 'WAIT' || sending.current) return;
+    if (!state || state.mode === 'OPEN' || state.mode === 'AUTHORIZED' || state.mode === 'WAIT' || sending.current) return;
     if (!tableAccessCode.safeParse(code).success) { setError('invalid'); return; }
     sending.current = true; setBusy(true); setError(null);
     try {
@@ -35,14 +54,13 @@ export function TableAccessEntry(props: Omit<MenuBrowserProps, 'table'> & { tabl
       setError(errors[body.error?.code ?? ''] ?? 'failed');
       if (response.status === 409 || body.error?.code === 'TABLE_CODE_REQUIRED') {
         setCode('');
-        const fresh = await fetch(path, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-        if (fresh.ok) setState(await fresh.json() as TableAccessState);
+        setState(await readEntry(path, AbortSignal.timeout(20000)));
       }
     } catch { setError('failed'); }
     finally { sending.current = false; setBusy(false); }
   }
   if (state?.mode === 'AUTHORIZED') return <MenuBrowser {...props} />;
-  if (!state || state.mode === 'WAIT') return <section className="mx-auto my-8 max-w-lg rounded-2xl border bg-white p-6"><p role="status">{t(state?.mode === 'WAIT' ? 'waiting' : error ? 'failed' : 'loading')}</p>{(error || state?.mode === 'WAIT') && <button type="button" className="mt-4 min-h-12 rounded-xl border px-5" onClick={() => window.location.reload()}>{t('retry')}</button>}</section>;
+  if (!state || state.mode === 'OPEN' || state.mode === 'WAIT') return <section className="mx-auto my-8 max-w-lg rounded-2xl border bg-white p-6"><p role="status">{t(state?.mode === 'WAIT' ? 'waiting' : error ? 'failed' : 'loading')}</p>{(error || state?.mode === 'WAIT') && <button type="button" className="mt-4 min-h-12 rounded-xl border px-5" onClick={() => window.location.reload()}>{t('retry')}</button>}</section>;
   const creating = state.mode !== 'JOIN';
   return <section data-testid="table-access-gate" data-mode={state.mode} className="mx-auto my-8 max-w-lg rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
     <h2 className="text-2xl font-bold">{t(creating ? 'createTitle' : 'joinTitle', { number: props.table.tableNumber })}</h2>

@@ -18,7 +18,15 @@
     "changed": "The table session has changed or closed. Check the entry step and try again.",
     "failed": "Unable to connect. Please try again.",
     "waiting": "Someone already at this table needs to reopen the menu and choose a code for this visit.",
-    "staffCode": "Table Code"
+    "staffCode": "Table Code",
+    "settingsTitle": "Table Security",
+    "enableCode": "Require a 3-digit table access code",
+    "settingsHint": "When enabled, the first customer creates a 3-digit code and additional customers must enter the same code before joining the table session.",
+    "enabledHint": "ON: Extra protection for Table QR links.",
+    "disabledHint": "OFF: Customers enter the table menu directly after scanning the QR.",
+    "newVisitsHint": "Changes apply to new table sessions. Active visits keep the mode they started with until they close.",
+    "enabled": "Access code enabled",
+    "disabled": "Access code disabled"
   },
   "Kitchen": {
     "settingsTitle": "Kitchen Settings",

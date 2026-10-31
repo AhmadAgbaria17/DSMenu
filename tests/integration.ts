@@ -129,6 +129,11 @@ async function main() {
     await runOrderHttpChecks(base);
     const { runStaffHttpChecks } = await import('./staff-http');
     const staffFixture = await runStaffHttpChecks(base);
+    if (process.argv.includes('--table-setting-only')) {
+      const { runTableAccessSettingChecks } = await import('./table-access-setting-http'); await runTableAccessSettingChecks(base, staffFixture);
+      const { runTableAccessSettingBrowserChecks } = await import('./table-access-setting-browser'); await runTableAccessSettingBrowserChecks(base, staffFixture);
+      return;
+    }
     if (process.argv.includes('--table-access-only')) {
       const { runTableAccessChecks } = await import('./table-access-http'); await runTableAccessChecks(base, staffFixture);
       const { runTableAccessBrowserChecks } = await import('./table-access-browser'); await runTableAccessBrowserChecks(base, staffFixture);
@@ -188,6 +193,8 @@ async function main() {
     const { runTableAccessChecks } = await import('./table-access-http');
     await runTableAccessChecks(base, staffFixture);
     if (process.argv.includes('--browser')) { const { runTableAccessBrowserChecks } = await import('./table-access-browser'); await runTableAccessBrowserChecks(base, staffFixture); }
+    const { runTableAccessSettingChecks } = await import('./table-access-setting-http'); await runTableAccessSettingChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runTableAccessSettingBrowserChecks } = await import('./table-access-setting-browser'); await runTableAccessSettingBrowserChecks(base, staffFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

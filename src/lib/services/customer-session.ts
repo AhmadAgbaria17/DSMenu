@@ -42,9 +42,14 @@ export async function requireCustomerVisit(target: CustomerTable, token: string 
 export async function getTableAccess(target: CustomerTable, token?: string): Promise<TableAccessState> {
   await closeEmptyTableSessions({ restaurantId: target.restaurant._id, tableId: target.table._id });
   const scope = { restaurantId: target.restaurant._id, tableId: target.table._id, status: 'ACTIVE' as const };
-  const visit = await TableSession.findOne(scope).select('_id +accessCode').lean();
-  if (!visit) return { mode: 'CREATE' };
+  const visit = await TableSession.findOne(scope).select('_id accessCodeRequired +accessCode').lean();
+  if (!visit) {
+    const restaurant = await Restaurant.findOne({ _id: target.restaurant._id, isActive: true }).select('tableAccessCodeEnabled').lean();
+    if (!restaurant) throw new CustomerRequestError('TABLE_UNAVAILABLE', 404);
+    return restaurant.tableAccessCodeEnabled !== false ? { mode: 'CREATE' } : { mode: 'OPEN', sessionId: null };
+  }
   const verified = token && tokenHash(token) && await TableSession.exists({ ...scope, _id: visit._id, ...credentialFilter(target, token) });
+  if (visit.accessCodeRequired === false) return verified ? { mode: 'AUTHORIZED', visitId: String(visit._id) } : { mode: 'OPEN', sessionId: String(visit._id) };
   if (verified) return visit.accessCode ? { mode: 'AUTHORIZED', visitId: String(visit._id) } : { mode: 'SETUP', sessionId: String(visit._id) };
   return visit.accessCode ? { mode: 'JOIN', sessionId: String(visit._id) } : { mode: 'WAIT' };
 }
@@ -72,31 +77,45 @@ export async function establishCustomerVisit(target: CustomerTable, existingToke
   const execute = () => mongoose.connection.transaction(async transaction => {
     const available = await Table.updateOne({ _id: target.table._id, restaurantId: target.restaurant._id, isActive: true }, { $inc: { lifecycleVersion: 1 } }, { session: transaction });
     if (!available.matchedCount) throw new CustomerRequestError('TABLE_UNAVAILABLE', 404);
-    const visit = await TableSession.findOne(scope).select('_id +accessCode +codeAttemptCount +codeAttemptWindowAt').session(transaction).lean();
-    if (input.action === 'CREATE') {
-      if (visit) throw new CustomerRequestError('TABLE_SESSION_STARTED', 409);
-      const [created] = await TableSession.create([{ ...scope, accessCode: input.code, credentials: [credential], lastActivityAt: new Date() }], { session: transaction });
+    const visit = await TableSession.findOne(scope).select('_id accessCodeRequired +accessCode +codeAttemptCount +codeAttemptWindowAt').session(transaction).lean();
+    if (!visit) {
+      if (input.action !== 'CREATE' && !(input.action === 'OPEN' && input.sessionId === null)) throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
+      // Serialize new-visit policy with settings writes, then snapshot it. Existing
+      // visits never consult the current setting for their join policy.
+      const restaurant = await Restaurant.findOneAndUpdate({ _id: target.restaurant._id, isActive: true }, { $inc: { __v: 1 } }, { session: transaction, timestamps: false, returnDocument: 'after' }).select('tableAccessCodeEnabled').lean();
+      if (!restaurant) throw new CustomerRequestError('TABLE_UNAVAILABLE', 404);
+      const required = restaurant.tableAccessCodeEnabled !== false;
+      if (required && input.action === 'OPEN') throw new CustomerRequestError('TABLE_CODE_REQUIRED', 403);
+      if (!required && input.action === 'CREATE') throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
+      const [created] = await TableSession.create([{ ...scope, accessCodeRequired: required, ...(input.action === 'CREATE' ? { accessCode: input.code } : {}), credentials: [credential], lastActivityAt: new Date() }], { session: transaction });
       return { visitId: String(created._id), newToken: token, expiresAt };
     }
-    if (!visit || String(visit._id) !== input.sessionId) throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
-    if (input.action === 'SETUP') {
-      const authorized = await requireCustomerVisit(target, existingToken, transaction);
-      if (String(authorized._id) !== input.sessionId) throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
-      if (visit.accessCode) throw new CustomerRequestError('TABLE_SESSION_STARTED', 409);
-      await TableSession.updateOne({ ...scope, _id: visit._id, accessCode: { $exists: false } }, { $set: { accessCode: input.code } }, { session: transaction, runValidators: true });
-      return { visitId: String(visit._id), newToken: null, expiresAt: null };
+    if (input.action === 'CREATE') throw new CustomerRequestError('TABLE_SESSION_STARTED', 409);
+    if (input.action === 'OPEN') {
+      if (visit.accessCodeRequired !== false) throw new CustomerRequestError('TABLE_CODE_REQUIRED', 403);
+      if (input.sessionId !== null && String(visit._id) !== input.sessionId) throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
+    } else {
+      if (String(visit._id) !== input.sessionId || visit.accessCodeRequired === false) throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
+      if (input.action === 'SETUP') {
+        const authorized = await requireCustomerVisit(target, existingToken, transaction);
+        if (String(authorized._id) !== input.sessionId) throw new CustomerRequestError('TABLE_SESSION_CHANGED', 409);
+        if (visit.accessCode) throw new CustomerRequestError('TABLE_SESSION_STARTED', 409);
+        await TableSession.updateOne({ ...scope, _id: visit._id, accessCode: { $exists: false } }, { $set: { accessCode: input.code } }, { session: transaction, runValidators: true });
+        return { visitId: String(visit._id), newToken: null, expiresAt: null };
+      }
+      if (!visit.accessCode) throw new CustomerRequestError('TABLE_CODE_REQUIRED', 403);
+      const now = new Date();
+      const inWindow = !!visit.codeAttemptWindowAt && now.getTime() - visit.codeAttemptWindowAt.getTime() < TABLE_CODE_WINDOW_MS;
+      const attempts = inWindow ? visit.codeAttemptCount ?? 0 : 0;
+      if (attempts >= TABLE_CODE_ATTEMPTS) throw new CustomerRequestError('TABLE_CODE_LIMIT', 429);
+      if (!timingSafeEqual(Buffer.from(visit.accessCode), Buffer.from(input.code))) {
+        await TableSession.updateOne({ ...scope, _id: visit._id }, { $set: { codeAttemptCount: attempts + 1, codeAttemptWindowAt: inWindow ? visit.codeAttemptWindowAt : now } }, { session: transaction, timestamps: false });
+        // Return, then throw AFTER commit, so failed attempts persist across
+        // workers/restarts and are not undone by transaction rollback.
+        return { denied: true as const };
+      }
     }
-    if (!visit.accessCode) throw new CustomerRequestError('TABLE_CODE_REQUIRED', 403);
     const now = new Date();
-    const inWindow = !!visit.codeAttemptWindowAt && now.getTime() - visit.codeAttemptWindowAt.getTime() < TABLE_CODE_WINDOW_MS;
-    const attempts = inWindow ? visit.codeAttemptCount ?? 0 : 0;
-    if (attempts >= TABLE_CODE_ATTEMPTS) throw new CustomerRequestError('TABLE_CODE_LIMIT', 429);
-    if (!timingSafeEqual(Buffer.from(visit.accessCode), Buffer.from(input.code))) {
-      await TableSession.updateOne({ ...scope, _id: visit._id }, { $set: { codeAttemptCount: attempts + 1, codeAttemptWindowAt: inWindow ? visit.codeAttemptWindowAt : now } }, { session: transaction, timestamps: false });
-      // Return, then throw AFTER commit, so failed attempts persist across
-      // workers/restarts and are not undone by transaction rollback.
-      return { denied: true as const };
-    }
     // Repeated successful submissions from an already joined browser do not
     // rotate cookies or exhaust the credential cap.
     if (existingToken && tokenHash(existingToken) && await TableSession.exists({ ...scope, _id: visit._id, ...credentialFilter(target, existingToken) }).session(transaction)) {

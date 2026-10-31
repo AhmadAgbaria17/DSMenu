@@ -13,6 +13,7 @@ const schema = new Schema({
   closeReason: { type: String, enum: ['MANUAL', 'AUTO_EMPTY_TIMEOUT'] },
   // Low-entropy shared entry gate, not the device authentication credential.
   // Only explicit server verification/staff projections may read it.
+  accessCodeRequired: { type: Boolean, default: true, immutable: true },
   accessCode: { type: String, match: /^[0-9]{3}$/, select: false },
   codeAttemptCount: { type: Number, default: 0, min: 0, validate: Number.isInteger, select: false },
   codeAttemptWindowAt: { type: Date, select: false },
@@ -27,5 +28,5 @@ schema.index({ restaurantId: 1, status: 1 });
 schema.index({ restaurantId: 1, createdAt: -1 });
 schema.index({ status: 1, nextOrderNumber: 1, createdAt: 1 }, { name: 'empty_session_cleanup' });
 schema.index({ restaurantId: 1, status: 1, createdAt: 1 }, { name: 'tenant_session_cleanup' });
-if (models.TableSession && !models.TableSession.schema.path('accessCode')) deleteModel('TableSession');
+if (models.TableSession && !models.TableSession.schema.path('accessCodeRequired')) deleteModel('TableSession');
 export const TableSession = cachedModel('TableSession', schema);
