@@ -1,3 +1,4 @@
+import { effectiveBasePrice } from '@/lib/product-price';
 import 'server-only';
 import type { ClientSession, Types } from 'mongoose';
 import { Category, Product } from '@/models';
@@ -18,8 +19,9 @@ export async function priceOrder(input: OrderInput, restaurantId: Types.ObjectId
       let customization;
       try { customization = resolveOptions(optionGroupsSchema.parse(product.optionGroups ?? []), item.selections); }
       catch { throw new CustomerRequestError('ITEMS_UNAVAILABLE', 422, [item.productId]); }
-      const price = product.price + customization.optionsTotal;
-      return { ...customization, basePrice: product.price, productId: product._id, nameAr: product.nameAr, nameHe: product.nameHe, nameEn: product.nameEn, price, quantity: item.quantity, notes: item.note, itemTotal: price * item.quantity };
+      const basePrice = effectiveBasePrice(product);
+      const price = basePrice + customization.optionsTotal;
+      return { ...customization, regularPriceAtOrder: product.price, discountApplied: basePrice < product.price, basePrice, productId: product._id, nameAr: product.nameAr, nameHe: product.nameHe, nameEn: product.nameEn, price, quantity: item.quantity, notes: item.note, itemTotal: price * item.quantity };
     });
     const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
     if (!moneySchema.safeParse(subtotal).success || items.some(item => !moneySchema.safeParse(item.price).success || !moneySchema.safeParse(item.itemTotal).success)) throw new CustomerRequestError('ORDER_LIMIT', 422);

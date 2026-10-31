@@ -1,4 +1,14 @@
 {
+  "Discount": {
+    "price": "Discount price",
+    "optional": "Discount price (optional)",
+    "sale": "Sale",
+    "originalPrice": "Original price",
+    "currentPrice": "Current price",
+    "invalid": "Invalid discount price.",
+    "lower": "Discount must be lower than regular price.",
+    "hint": "If a discount price is entered, the original price appears struck through on the menu. Clear this field to remove the discount."
+  },
   "TableAccess": {
     "createTitle": "Start Table {number}",
     "joinTitle": "Join Table {number}",

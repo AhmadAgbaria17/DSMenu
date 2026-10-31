@@ -9,7 +9,7 @@ export type CustomerOrder = {
   subtotal: number;
   currency: string;
   createdAt: string;
-  items: (LocalizedName & { optionGroups?: import('@/lib/product-options').OptionSnapshot[]; basePrice?: number; optionsTotal?: number; productId: string; price: number; quantity: number; note: string; itemTotal: number })[];
+  items: (LocalizedName & { optionGroups?: import('@/lib/product-options').OptionSnapshot[]; regularPriceAtOrder?: number; discountApplied?: boolean; basePrice?: number; optionsTotal?: number; productId: string; price: number; quantity: number; note: string; itemTotal: number })[];
 };
 export const customerErrorCodes = ['TABLE_CODE_REQUIRED', 'TABLE_CODE_INCORRECT', 'TABLE_CODE_LIMIT', 'TABLE_SESSION_STARTED', 'TABLE_SESSION_CHANGED', 'INVALID_REQUEST', 'FORBIDDEN', 'TABLE_UNAVAILABLE', 'SESSION_REQUIRED', 'SESSION_CLOSED', 'SESSION_LIMIT', 'ITEMS_UNAVAILABLE', 'NOTES_DISABLED', 'REQUEST_CONFLICT', 'ORDER_LIMIT', 'SERVICE_UNAVAILABLE', 'NETWORK_ERROR', 'VISIT_CHANGED'] as const;
 export type CustomerErrorCode = (typeof customerErrorCodes)[number];

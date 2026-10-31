@@ -19,7 +19,7 @@ export async function getManagedMenu(): Promise<ManagedMenu> {
   ]);
   return {
     categories: categories.map(c => ({ id: String(c._id), nameAr: c.nameAr, nameHe: c.nameHe, nameEn: c.nameEn, sortOrder: c.sortOrder, isActive: c.isActive, image: image(c.image) })),
-    products: products.map(p => ({ id: String(p._id), categoryId: String(p.categoryId), nameAr: p.nameAr, nameHe: p.nameHe, nameEn: p.nameEn, descriptionAr: p.descriptionAr, descriptionHe: p.descriptionHe, descriptionEn: p.descriptionEn, optionGroups: optionGroupsSchema.parse(p.optionGroups ?? []), price: p.price, sortOrder: p.sortOrder, isAvailable: p.isAvailable, isFeatured: p.isFeatured, allowCustomerNote: p.allowCustomerNote !== false, isArchived: p.isArchived, image: image(p.image) })),
+    products: products.map(p => ({ id: String(p._id), categoryId: String(p.categoryId), nameAr: p.nameAr, nameHe: p.nameHe, nameEn: p.nameEn, descriptionAr: p.descriptionAr, descriptionHe: p.descriptionHe, descriptionEn: p.descriptionEn, optionGroups: optionGroupsSchema.parse(p.optionGroups ?? []), price: p.price, discountPrice: p.discountPrice ?? null, sortOrder: p.sortOrder, isAvailable: p.isAvailable, isFeatured: p.isFeatured, allowCustomerNote: p.allowCustomerNote !== false, isArchived: p.isArchived, image: image(p.image) })),
     restaurant: { tableAccessCodeEnabled: restaurant.tableAccessCodeEnabled !== false, kitchenPrintingEnabled: restaurant.kitchenPrintingEnabled !== false, id: String(restaurant._id), name: restaurant.name, slug: restaurant.slug, description: restaurant.description, phone: restaurant.phone ?? '', whatsapp: restaurant.whatsapp ?? '', address: restaurant.address ?? '', googleMapsUrl: restaurant.googleMapsUrl ?? '', instagramUrl: restaurant.instagramUrl ?? '', primaryColor: restaurant.primaryColor, logo: image(restaurant.logo), coverImage: image(restaurant.coverImage) },
   };
 }
@@ -35,8 +35,17 @@ export async function saveProduct(payload: unknown, id?: string, flagsOnly = fal
   if (!parsed.success || (id !== undefined && !objectIdSchema.safeParse(id).success)) throw new StaffApiError('INVALID_REQUEST', 400);
   if (id && !await Product.exists({ _id: id, restaurantId: staff.restaurantId })) throw new StaffApiError('NOT_FOUND', 404);
   if ('categoryId' in parsed.data && !await Category.exists({ _id: parsed.data.categoryId, restaurantId: staff.restaurantId })) throw new StaffApiError('NOT_FOUND', 404);
-  const result = id ? await Product.findOneAndUpdate({ _id: id, restaurantId: staff.restaurantId }, { $set: parsed.data }, { runValidators: true, returnDocument: 'after' }) : await Product.create({ ...parsed.data, restaurantId: staff.restaurantId });
-  if (!result) throw new StaffApiError('NOT_FOUND', 404);
+  // Older clients can omit the discount. Preserve it, but reject a new regular
+  // price that would invalidate it, atomically against concurrent price edits.
+  const regularPrice = 'price' in parsed.data && typeof parsed.data.price === 'number' ? parsed.data.price : undefined;
+  const suppliedDiscount = 'discountPrice' in parsed.data && parsed.data.discountPrice !== undefined;
+  const preserveDiscount = regularPrice !== undefined && !suppliedDiscount;
+  const priceGuard = regularPrice !== undefined && !suppliedDiscount ? { $or: [{ discountPrice: null }, { discountPrice: { $lt: regularPrice } }] } : {};
+  const result = id ? await Product.findOneAndUpdate({ _id: id, restaurantId: staff.restaurantId, ...priceGuard }, { $set: parsed.data }, { runValidators: true, returnDocument: 'after' }) : await Product.create({ ...parsed.data, restaurantId: staff.restaurantId });
+  if (!result) {
+    if (preserveDiscount && await Product.exists({ _id: id, restaurantId: staff.restaurantId })) throw new StaffApiError('INVALID_REQUEST', 400);
+    throw new StaffApiError('NOT_FOUND', 404);
+  }
   await invalidateMenu(staff.restaurantId); return { id: String(result._id) };
 }
 export async function saveRestaurant(payload: unknown) {

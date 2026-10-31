@@ -6,10 +6,12 @@ import { optionGroupsSchema } from '@/lib/product-options';
 import { useTranslations } from 'next-intl';
 import type { ManagedCategory, ManagedProduct } from '@/types/menu-management';
 import { TranslationFields, SortField, Flag, inputClass, actionClass } from './menu-fields';
-import { priceForInput } from '@/lib/validators/menu-management';
+import { priceForInput, priceInput, discountPriceInput } from '@/lib/validators/menu-management';
 type Props = { category?: ManagedCategory; product?: ManagedProduct; categories: ManagedCategory[]; mode: 'categories' | 'products'; pending: boolean; save: (data: Record<string, unknown>) => Promise<void> };
 export function MenuEditor({ category, product, categories, mode, pending, save }: Props) {
   const t = useTranslations('Management');
+  const discount = useTranslations('Discount');
+  const [discountError, setDiscountError] = useState<'invalid' | 'lower' | null>(null);
   const optionText = useTranslations('Options');
   const [optionGroups, setOptionGroups] = useState(product?.optionGroups ?? []);
   const optionsSection = useRef<HTMLDivElement>(null);
@@ -18,8 +20,14 @@ export function MenuEditor({ category, product, categories, mode, pending, save 
   const value = mode === 'categories' ? category : product;
   return <form onSubmit={event => {
     event.preventDefault(); const data = new FormData(event.currentTarget);
+    setDiscountError(null);
+    if (mode === 'products') {
+      const regular = priceInput.safeParse(data.get('price')); const sale = discountPriceInput.safeParse(data.get('discountPrice'));
+      if (!regular.success || !sale.success) { setDiscountError('invalid'); return; }
+      if (sale.data != null && sale.data >= regular.data) { setDiscountError('lower'); return; }
+    }
     const common = { nameAr: data.get('nameAr'), nameHe: data.get('nameHe'), nameEn: data.get('nameEn'), sortOrder: Number(data.get('sortOrder')) };
-    void save(mode === 'categories' ? { ...common, isActive: data.has('isActive') } : { ...common, optionGroups, categoryId: data.get('categoryId'), descriptionAr: data.get('descriptionAr'), descriptionHe: data.get('descriptionHe'), descriptionEn: data.get('descriptionEn'), price: data.get('price'), isAvailable: data.has('isAvailable'), isFeatured: data.has('isFeatured'), allowCustomerNote: data.has('allowCustomerNote'), isArchived: product?.isArchived ?? false });
+    void save(mode === 'categories' ? { ...common, isActive: data.has('isActive') } : { ...common, optionGroups, categoryId: data.get('categoryId'), descriptionAr: data.get('descriptionAr'), descriptionHe: data.get('descriptionHe'), descriptionEn: data.get('descriptionEn'), price: data.get('price'), discountPrice: data.get('discountPrice'), isAvailable: data.has('isAvailable'), isFeatured: data.has('isFeatured'), allowCustomerNote: data.has('allowCustomerNote'), isArchived: product?.isArchived ?? false });
   }} className="space-y-6" aria-busy={pending}>
     {mode === 'products' && <section data-testid="options-entry" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <h3 className="text-lg font-bold">{optionText('title')}</h3><p className="mt-2 text-sm">{optionText('entryHint', { count: optionGroups.length })}</p>
@@ -28,6 +36,7 @@ export function MenuEditor({ category, product, categories, mode, pending, save 
     </section>}
     <TranslationFields value={value} descriptions={mode === 'products'} />
     {mode === 'products' && <div className="grid gap-5 sm:grid-cols-2"><label className="block text-sm font-bold">{t('category')}<select aria-label={t('category')} name="categoryId" required defaultValue={product?.categoryId ?? ''} className={inputClass}><option value="">{t('chooseCategory')}</option>{categories.map(item => <option key={item.id} value={item.id}>{item.nameAr} / {item.nameHe} / {item.nameEn}{item.isActive ? '' : ` (${t('inactive')})`}</option>)}</select></label><label className="block text-sm font-bold">{t('price')}<input aria-label={t('price')} name="price" required inputMode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" maxLength={10} dir="ltr" defaultValue={product ? priceForInput(product.price) : ''} className={inputClass} /><span className="mt-2 block font-normal text-stone-500">{t('priceHint')}</span></label></div>}
+    {mode === 'products' && <label className="block text-sm font-bold">{discount('optional')}<input aria-label={discount('optional')} name="discountPrice" inputMode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" maxLength={10} dir="ltr" defaultValue={product?.discountPrice == null ? '' : priceForInput(product.discountPrice)} className={inputClass} aria-invalid={!!discountError} aria-describedby="discount-price-hint" onChange={() => setDiscountError(null)} /><span id="discount-price-hint" className="mt-2 block font-normal text-stone-500">{discount('hint')}</span>{discountError && <span role="alert" className="mt-2 block text-red-800">{discount(discountError)}</span>}</label>}
     <SortField value={value?.sortOrder} />
     <div className="flex flex-wrap gap-6">{mode === 'categories' ? <Flag name="isActive" checked={category?.isActive ?? true} /> : <><Flag name="isAvailable" checked={product?.isAvailable ?? true} /><Flag name="isFeatured" checked={product?.isFeatured ?? false} /><Flag name="allowCustomerNote" checked={product?.allowCustomerNote !== false} /></>}</div>
     {mode === 'products' && <div ref={optionsSection} tabIndex={-1} className="scroll-mt-24 rounded-xl"><OptionsEditor templates groups={optionGroups} onChange={setOptionGroups} disabled={pending} />{!validOptions && <p role="alert" className="text-red-800">{optionText('invalidConfig')}</p>}</div>}

@@ -8,6 +8,8 @@ Implemented: database models, seed data, localized menu, table QR recognition, p
 
 Product customization is documented in [Product Options](docs/PRODUCT-OPTIONS.md), including staff setup, pricing/snapshot rules, backward compatibility and a Classic Burger smoke test.
 
+Optional product sale pricing is documented in [Product Discounts](docs/PRODUCT-DISCOUNTS.md), including discount removal, option pricing, historical snapshots and regression coverage.
+
 - [ ] Review source and staged files for secrets before publishing; this workspace has no Git history to audit.
 - [ ] Provision separate production Atlas/Pusher/Cloudinary resources and canonical HTTPS origins.
 - [ ] Run `npm run db:indexes` with the intended production database, then the insert-only `npm run create-restaurant -- --name "Restaurant Name" --slug restaurant-name` operator CLI.

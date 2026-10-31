@@ -27,6 +27,7 @@ export type PublicProduct = LocalizedName & {
   descriptionHe: string;
   descriptionEn: string;
   price: number;
+  discountPrice?: number | null;
   image: PublicImage | null;
   isAvailable: boolean;
   allowCustomerNote?: boolean; isFeatured: boolean;

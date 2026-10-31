@@ -1,3 +1,4 @@
+import { effectiveBasePrice } from '@/lib/product-price';
 import { canonicalSelections, selectionsSchema, resolveOptions, type Selection, type OptionSnapshot } from './product-options';
 import { z } from 'zod';
 import { objectIdSchema, tableNumberSchema } from '@/lib/validators/common';
@@ -122,9 +123,9 @@ export function getCartSummary(items: CartItem[], products: PublicProduct[]) {
     if (!product) return [];
     try {
       const options = resolveOptions(product.optionGroups, item.selections);
-      const unitPrice = product.price + options.optionsTotal;
+      const unitPrice = effectiveBasePrice(product) + options.optionsTotal;
       return [{ ...item, product, unitPrice, needsReview: product.allowCustomerNote === false && !!item.note, optionGroups: options.optionGroups, itemTotal: unitPrice * item.quantity }];
-    } catch { return [{ ...item, product, unitPrice: product.price, needsReview: true, optionGroups: [], itemTotal: 0 }]; }
+    } catch { return [{ ...item, product, unitPrice: effectiveBasePrice(product), needsReview: true, optionGroups: [], itemTotal: 0 }]; }
   });
   return {
     lines,

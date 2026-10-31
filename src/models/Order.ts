@@ -6,6 +6,8 @@ import { optionSnapshot } from './product-options';
 const itemSchema = new Schema({
   productId: reference('Product'), ...localizedNames,
   price: minorUnits,
+  regularPriceAtOrder: { ...minorUnits, required: false },
+  discountApplied: { type: Boolean, required: false },
   basePrice: { ...minorUnits, required: false },
   optionsTotal: { ...minorUnits, required: false },
   optionGroups: { type: [optionSnapshot], default: [] },
@@ -44,7 +46,6 @@ schema.pre('validate', function () {
   if (this.fulfillmentType === 'TAKEAWAY' && (this.tableId || this.tableSessionId)) this.invalidate('tableId', 'Takeaway cannot reference a table.');
   if (this.fulfillmentType !== 'TAKEAWAY' && (this.takeawaySessionId || this.customerName || this.customerPhone)) this.invalidate('takeawaySessionId', 'Table orders cannot reference takeaway identity.');
 });
-// Next.js hot reload can retain the model compiled before batch identity existed.
-// Strict Mongoose updates would otherwise discard the new field but save status.
-if (models.Order && !models.Order.schema.path('preparationBatchId')) deleteModel('Order');
+// Hot reload must not retain a schema that would discard new pricing snapshots.
+if (models.Order && !models.Order.schema.path('items.regularPriceAtOrder')) deleteModel('Order');
 export const Order = cachedModel('Order', schema);

@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { tableAccessFetch as fetch } from './table-access-fixture';
+import { Category, Product, Table, Order } from '../src/models';
+import { AuthClient, type StaffFixture } from './staff-http';
+import { createStaffUser } from '../src/lib/staff-users';
+import { optionFixture } from './option-fixture';
+import { defaultSelections } from '../src/lib/product-options';
+import type { AnalyticsDto } from '../src/types/analytics';
+
+export async function runDiscountHttpChecks(base: string, fixture: StaffFixture) {
+  await createStaffUser({ restaurant: 'salt', name: 'Discount Staff', email: 'discount@salt.local', password: fixture.password, role: 'STAFF' });
+  const staff = new AuthClient(base); await staff.login('discount@salt.local', fixture.password);
+  const category = await Category.create({ restaurantId: fixture.restaurantId, nameAr: 'Discount', nameHe: 'Discount', nameEn: 'Discount' });
+  const groups = optionFixture();
+  const input = { categoryId: String(category._id), nameAr: 'Discount Burger', nameHe: 'Discount Burger', nameEn: 'Discount Burger', descriptionAr: '', descriptionHe: '', descriptionEn: '', price: '48', sortOrder: 0, isAvailable: true, isFeatured: true, isArchived: false, optionGroups: groups };
+  const save = (body: unknown, id?: string) => staff.request('/api/dashboard/products' + (id ? '/' + id : ''), { method: id ? 'PUT' : 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  for (const discountPrice of ['48', '49', '-1', '1.001']) assert.equal((await save({ ...input, discountPrice })).status, 400);
+  const created = await save({ ...input, discountPrice: '39' }); assert.equal(created.status, 200);
+  const { id } = await created.json() as { id: string };
+  assert.equal((await Product.findById(id).orFail()).discountPrice, 3900);
+  assert.equal((await save(input, id)).status, 200);
+  assert.equal((await Product.findById(id).orFail()).discountPrice, 3900, 'omitted field preserves discount');
+  assert.equal((await save({ ...input, price: '30' }, id)).status, 400, 'legacy price edit cannot invalidate discount');
+  const foreign = await Product.findOne({ restaurantId: { $ne: fixture.restaurantId } }).orFail();
+  assert.equal((await save({ ...input, discountPrice: '39' }, String(foreign._id))).status, 404);
+  const table = await Table.create({ restaurantId: fixture.restaurantId, tableNumber: 430 });
+  const post = (path: string, body: unknown, cookie = '') => fetch(base + path, { method: 'POST', headers: { Origin: base, cookie, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const visit = await post('/api/r/salt/tables/430/session', {}); assert.equal(visit.status, 200);
+  const cookie = visit.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const selections = defaultSelections(groups); selections[1].optionIds = [groups[1].options[0].id];
+  const payload = { clientRequestId: randomUUID(), subtotal: 1, items: [{ productId: id, quantity: 2, note: '', selections, price: 1, discountPrice: 1, effectiveBasePrice: 1 }] };
+  const response = await post('/api/r/salt/tables/430/orders', payload, cookie); assert.equal(response.status, 200);
+  const orderId = (await response.json()).order.id as string;
+  const original = await Order.findById(orderId).lean().orFail();
+  assert.equal(original.subtotal, 8800);
+  const item = original.items[0];
+  assert.equal(item.regularPriceAtOrder, 4800); assert.equal(item.basePrice, 3900); assert.equal(item.discountApplied, true);
+  assert.equal(item.optionsTotal, 500); assert.equal(item.price, 4400); assert.equal(item.itemTotal, 8800);
+  const takeaway = await post('/api/r/salt/takeaway/session', { customerName: 'Discount test', customerPhone: '0501234567' }); assert.equal(takeaway.status, 200);
+  const takeawayVisitId = (await takeaway.json()).visitId as string;
+  const takeawayCookie = takeaway.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+  const away = await post('/api/r/salt/takeaway/orders', { ...payload, takeawayVisitId }, takeawayCookie); assert.equal(away.status, 200); assert.equal((await away.json()).order.subtotal, 8800);
+  assert.equal((await save({ ...input, discountPrice: '' }, id)).status, 200);
+  assert.equal((await Product.findById(id).orFail()).discountPrice, null);
+  const retry = await post('/api/r/salt/tables/430/orders', payload, cookie); assert.equal(retry.status, 200); assert.equal((await retry.json()).order.id, orderId);
+  assert.deepEqual(await Order.findById(orderId).lean().orFail(), original);
+  const bill = await staff.request(`/api/dashboard/tables/${table._id}/bill?sessionId=${original.tableSessionId}`); assert.equal(bill.status, 200); assert.equal((await bill.json()).finalTotal, 8800);
+  for (const [expectedStatus, status] of [['NEW', 'PREPARING'], ['PREPARING', 'READY']]) {
+    const changed = await staff.request(`/api/dashboard/orders/${orderId}`, { method: 'PATCH', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedStatus, status }) });
+    assert.equal(changed.status, 200);
+  }
+  const analytics = await (await staff.request('/api/dashboard/analytics?range=today')).json() as AnalyticsDto;
+  assert.equal(analytics.products.find(p => p.id === id)?.completedValue, 8800, 'analytics uses charged snapshots after discount removal');
+  const regular = await post('/api/r/salt/tables/430/orders', { ...payload, clientRequestId: randomUUID() }, cookie); assert.equal(regular.status, 200); assert.equal((await regular.json()).order.subtotal, 10600);
+  assert.equal((await save({ ...input, discountPrice: '0' }, id)).status, 200);
+  const freeBase = await post('/api/r/salt/tables/430/orders', { ...payload, clientRequestId: randomUUID() }, cookie); assert.equal(freeBase.status, 200); assert.equal((await freeBase.json()).order.subtotal, 1000);
+  assert.equal((await save({ ...input, discountPrice: '39' }, id)).status, 200);
+  console.log('PASS: discount validation/persistence/clearing, legacy edits, tenant isolation, authoritative TABLE/TAKEAWAY pricing with extras, zero discount, immutable snapshots, idempotent retries and final bill.');
+  return { id };
+}

@@ -27,7 +27,7 @@ export async function getPublicRestaurant(slug: string, tableQuery: string | str
   const products = await Product.find({
     restaurantId, categoryId: { $in: categories.map(category => category._id) }, isArchived: false,
     ...(restaurant.hideUnavailableProducts ? { isAvailable: true } : {}),
-  }).select('categoryId nameAr nameHe nameEn descriptionAr descriptionHe descriptionEn price optionGroups image isAvailable isFeatured allowCustomerNote sortOrder')
+  }).select('categoryId nameAr nameHe nameEn descriptionAr descriptionHe descriptionEn price discountPrice optionGroups image isAvailable isFeatured allowCustomerNote sortOrder')
     .sort({ sortOrder: 1, _id: 1 }).lean();
   const number = tableQuerySchema.safeParse(tableQuery);
   const table = number.success ? tables.find(t => t.tableNumber === number.data) ?? null : null;
@@ -48,7 +48,7 @@ export async function getPublicRestaurant(slug: string, tableQuery: string | str
       id: String(item._id), categoryId: String(item.categoryId),
       nameAr: item.nameAr, nameHe: item.nameHe, nameEn: item.nameEn,
       descriptionAr: item.descriptionAr, descriptionHe: item.descriptionHe, descriptionEn: item.descriptionEn,
-      optionGroups: sortedGroups(optionGroupsSchema.parse(item.optionGroups ?? [])), price: item.price, image: publicImage(item.image),
+      optionGroups: sortedGroups(optionGroupsSchema.parse(item.optionGroups ?? [])), price: item.price, discountPrice: item.discountPrice ?? null, image: publicImage(item.image),
       isAvailable: item.isAvailable, isFeatured: item.isFeatured, allowCustomerNote: item.allowCustomerNote !== false, sortOrder: item.sortOrder,
     })),
   };

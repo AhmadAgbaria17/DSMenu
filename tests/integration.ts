@@ -110,7 +110,7 @@ async function main() {
       assert.match(invalid.html, /This table link is invalid/);
       assert.doesNotMatch(invalid.html, /data-testid="detected-table"|id="choose-table"/);
     }
-    if (process.argv.includes('--browser')) {
+    if (process.argv.includes('--browser') && !process.argv.includes('--discount-only')) {
       const { runBrowserChecks } = await import('./browser-flows');
       const burger = await models.Product.findOne({ restaurantId: salt._id, nameEn: 'Classic Burger' }).orFail();
       const unavailable = await models.Product.findOne({ restaurantId: salt._id, isAvailable: false }).orFail();
@@ -129,6 +129,12 @@ async function main() {
     await runOrderHttpChecks(base);
     const { runStaffHttpChecks } = await import('./staff-http');
     const staffFixture = await runStaffHttpChecks(base);
+    if (process.argv.includes('--discount-only')) {
+      const { runDiscountHttpChecks } = await import('./product-discount-http');
+      const discountFixture = await runDiscountHttpChecks(base, staffFixture);
+      if (process.argv.includes('--browser')) { const { runDiscountBrowserChecks } = await import('./product-discount-browser'); await runDiscountBrowserChecks(base, staffFixture, discountFixture); }
+      return;
+    }
     if (process.argv.includes('--table-setting-only')) {
       const { runTableAccessSettingChecks } = await import('./table-access-setting-http'); await runTableAccessSettingChecks(base, staffFixture);
       const { runTableAccessSettingBrowserChecks } = await import('./table-access-setting-browser'); await runTableAccessSettingBrowserChecks(base, staffFixture);
@@ -195,6 +201,9 @@ async function main() {
     if (process.argv.includes('--browser')) { const { runTableAccessBrowserChecks } = await import('./table-access-browser'); await runTableAccessBrowserChecks(base, staffFixture); }
     const { runTableAccessSettingChecks } = await import('./table-access-setting-http'); await runTableAccessSettingChecks(base, staffFixture);
     if (process.argv.includes('--browser')) { const { runTableAccessSettingBrowserChecks } = await import('./table-access-setting-browser'); await runTableAccessSettingBrowserChecks(base, staffFixture); }
+    const { runDiscountHttpChecks } = await import('./product-discount-http');
+    const discountFixture = await runDiscountHttpChecks(base, staffFixture);
+    if (process.argv.includes('--browser')) { const { runDiscountBrowserChecks } = await import('./product-discount-browser'); await runDiscountBrowserChecks(base, staffFixture, discountFixture); }
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: false } });
     assert.match((await page('/r/salt?table=7', 'en')).html, /This table link is invalid/);
     await models.Table.updateOne({ _id: table._id }, { $set: { isActive: true } });

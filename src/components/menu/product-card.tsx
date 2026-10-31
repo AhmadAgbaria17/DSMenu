@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { localizedName } from '@/i18n/config';
 import { localizedDescription } from '@/lib/menu';
-import { formatMoney } from '@/lib/money';
+import { ProductPrice } from './product-price';
 import type { PublicProduct } from '@/types/menu';
 import { MenuImage } from './menu-image';
 
@@ -22,7 +22,7 @@ export function ProductCard({ product, currency, onOpen, canAdd }: {
       </div>
       <div className="px-5 pt-5"><h4 className="text-lg font-bold">{name}</h4><p className="mt-2 line-clamp-2 min-h-12 text-sm leading-6 text-stone-600">{localizedDescription(product, locale)}</p></div>
     </button>
-    <div className="flex items-center justify-between gap-3 p-5 pt-3"><bdi className="font-bold">{formatMoney(product.price, locale, currency)}</bdi>
+    <div className="flex items-center justify-between gap-3 p-5 pt-3"><ProductPrice product={product} currency={currency} />
       <button type="button" disabled={!product.isAvailable || !canAdd} onClick={onOpen} aria-label={t('addProduct', { name })}
         className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f0f3ec] px-5 text-sm font-bold text-emerald-950 enabled:hover:bg-emerald-100"><span aria-hidden="true">+</span>{t('add')}</button>
     </div>

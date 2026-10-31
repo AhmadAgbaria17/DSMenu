@@ -1,4 +1,6 @@
 'use client';
+import { effectiveBasePrice } from '@/lib/product-price';
+import { ProductPrice } from './product-price';
 import { defaultSelections, resolveOptions } from '@/lib/product-options';
 import { OptionSelector } from './option-selector';
 
@@ -29,7 +31,7 @@ export function ProductDetails({ product, currency, onClose, onAdded }: {
   let validOptions = true;
   try { resolveOptions(product.optionGroups, selections); } catch { validOptions = false; }
   const optionPrice = (product.optionGroups ?? []).flatMap(g => g.options.filter(o => o.isActive && selections.some(s => s.groupId === g.id && s.optionIds.includes(o.id)))).reduce((sum, o) => sum + o.priceDelta, 0);
-  const unitPrice = product.price + optionPrice;
+  const unitPrice = effectiveBasePrice(product) + optionPrice;
   const noteId = useId();
   const name = localizedName(product, locale);
   const existing = cart.lines.find(line => cartLineKey(line) === cartLineKey({ productId: product.id, note: note.trim(), selections }));
@@ -44,7 +46,7 @@ export function ProductDetails({ product, currency, onClose, onAdded }: {
       cart.dispatch({ type: 'add', productId: product.id, quantity, note, ...(selections.length ? { selections } : {}) });
       onAdded();
     }}>
-      <div><p className="text-lg font-bold"><bdi>{formatMoney(product.price, locale, currency)}</bdi></p><p className="mt-3 leading-7 text-stone-600">{localizedDescription(product, locale)}</p></div>
+      <div><p className="text-lg font-bold"><ProductPrice product={product} currency={currency} /></p><p className="mt-3 leading-7 text-stone-600">{localizedDescription(product, locale)}</p></div>
       {!product.isAvailable ? <p className="rounded-xl bg-stone-100 p-4 text-stone-700">{menu('unavailable')}</p> : <>
         <OptionSelector groups={product.optionGroups ?? []} selections={selections} onChange={setSelections} currency={currency} />
         <div className="flex flex-wrap items-center justify-between gap-4"><span className="font-bold">{t('quantity')}</span><QuantityControl quantity={quantity} name={name} onChange={setQuantity} /></div>
